@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medical Enrichment — Welltory</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0d0f14;
+    --surface:   #13161d;
+    --border:    #1e2330;
+    --border2:   #2a3040;
+    --text:      #e8eaf0;
+    --muted:     #6b7285;
+    --accent:    #4f8ef7;
+    --accent2:   #7c5cfc;
+    --green:     #3ecf8e;
+    --yellow:    #f5a623;
+    --red:       #f55e5e;
+    --pill-bg:   #1a1f2e;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 48px 24px 80px;
+  }
+
+  /* ── header ── */
+  header {
+    max-width: 900px;
+    margin: 0 auto 48px;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+  }
+  header h1 {
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  header .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-bottom: 2px; }
+  header .tag {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    background: rgba(79,142,247,.1);
+    border: 1px solid rgba(79,142,247,.2);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  /* ── layout ── */
+  .layout {
+    max-width: 900px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 680px) { .layout { grid-template-columns: 1fr; } }
+
+  /* ── panels ── */
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .panel-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .panel-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .panel-body { padding: 18px; }
+
+  /* ── textarea ── */
+  textarea {
+    width: 100%;
+    height: 320px;
+    background: transparent;
+    border: none;
+    outline: none;
+    resize: none;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--text);
+    caret-color: var(--accent);
+  }
+  textarea::placeholder { color: var(--muted); opacity: .5; }
+
+  /* ── button ── */
+  .btn-row {
+    max-width: 900px;
+    margin: 16px auto;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+  }
+  button {
+    padding: 11px 24px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity .15s, transform .1s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  button:hover { opacity: .88; transform: translateY(-1px); }
+  button:active { transform: translateY(0); }
+  button:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+  .btn-clear {
+    background: transparent;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    font-weight: 400;
+  }
+  .btn-clear:hover { color: var(--text); border-color: var(--muted); opacity: 1; }
+
+  .status {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-left: auto;
+  }
+  .status.loading { color: var(--accent); }
+  .status.error   { color: var(--red); }
+  .status.ok      { color: var(--green); }
+
+  /* ── URL config ── */
+  .url-row {
+    max-width: 900px;
+    margin: 0 auto 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+  }
+  .url-row label {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .url-row input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--accent);
+  }
+
+  /* ── result output ── */
+  #output-panel { grid-column: 1 / -1; display: none; }
+  #output-panel.visible { display: block; }
+
+  /* ── cards ── */
+  .section-title {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+  .cards { display: flex; flex-direction: column; gap: 10px; }
+
+  .card {
+    background: var(--pill-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    animation: fadeUp .3s ease both;
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .card-name {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .card-user {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    font-style: italic;
+  }
+
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .badge {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .badge-code  { background: rgba(79,142,247,.12); color: var(--accent); border: 1px solid rgba(79,142,247,.2); }
+  .badge-class { background: rgba(124,92,252,.12); color: var(--accent2); border: 1px solid rgba(124,92,252,.2); }
+  .badge-hrv   { background: rgba(245,166,35,.12);  color: var(--yellow); border: 1px solid rgba(245,166,35,.25); }
+  .badge-ok    { background: rgba(62,207,142,.1);   color: var(--green);  border: 1px solid rgba(62,207,142,.2); }
+  .badge-unres { background: rgba(245,94,94,.1);    color: var(--red);    border: 1px solid rgba(245,94,94,.2); }
+  .badge-atc   { background: rgba(107,114,133,.12); color: var(--muted);  border: 1px solid var(--border2); }
+
+  .card-def {
+    font-size: 12px;
+    line-height: 1.6;
+    color: #9ba3b5;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+    margin-top: 6px;
+  }
+
+  .brands {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+  .brands span { color: #8b95aa; }
+
+  .icd-link {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 8px;
+    opacity: .7;
+    transition: opacity .15s;
+  }
+  .icd-link:hover { opacity: 1; }
+
+  /* ── index terms ── */
+  .index-terms {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 8px;
+  }
+  .index-term {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(255,255,255,.04);
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+
+  /* ── meta ── */
+  .meta-row {
+    max-width: 900px;
+    margin: 16px auto 0;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    gap: 16px;
+  }
+  .meta-row span { color: var(--green); }
+
+  /* ── sections layout ── */
+  .results-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+  }
+
+  /* ── spinner ── */
+  .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,.2);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin .6s linear infinite;
+    display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── raw json toggle ── */
+  .raw-toggle {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--border2);
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 400;
+    transition: color .15s, border-color .15s;
+  }
+  .raw-toggle:hover { color: var(--text); border-color: var(--muted); opacity: 1; }
+
+  pre#raw-json {
+    display: none;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    line-height: 1.7;
+    color: #8b95aa;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin-top: 16px;
+    padding: 16px;
+    background: rgba(0,0,0,.3);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    max-height: 400px;
+    overflow-y: auto;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="dot"></div>
+  <h1>Medical Enrichment</h1>
+  <div class="tag">Welltory · Health Profile</div>
+</header>
+
+<!-- URL config -->
+<div class="url-row">
+  <label>SERVICE URL</label>
+  <input type="text" id="service-url" placeholder="https://your-app.up.railway.app" />
+</div>
+
+<!-- Input / raw output panels -->
+<div class="layout">
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-label">Input JSON</span>
+      <button class="btn-clear" onclick="loadExample()" style="padding:4px 10px;font-size:11px;">load example</button>
+    </div>
+    <div class="panel-body">
+      <textarea id="input-json" placeholder='{
+  "conditions": [...],
+  "medications": [...],
+  "symptoms": [...]
+}'></textarea>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-header">
+      <span class="panel-label">Raw Response</span>
+      <button class="raw-toggle" id="raw-btn" onclick="toggleRaw()" style="display:none">show raw</button>
+    </div>
+    <div class="panel-body" style="max-height:360px;overflow-y:auto;">
+      <pre id="raw-json"></pre>
+      <div id="raw-placeholder" style="color:var(--muted);font-family:'DM Mono',monospace;font-size:12px;padding:8px 0;">
+        Response will appear here after enrichment.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Action row -->
+<div class="btn-row">
+  <button id="enrich-btn" onclick="enrich()">
+    <span id="btn-text">Enrich</span>
+  </button>
+  <button class="btn-clear" onclick="clearAll()">Clear</button>
+  <span class="status" id="status"></span>
+</div>
+
+<!-- Results -->
+<div class="panel" id="output-panel">
+  <div class="panel-header">
+    <span class="panel-label">Enriched Result</span>
+    <span id="meta-info" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);"></span>
+  </div>
+  <div class="panel-body">
+    <div class="results-grid" id="results-grid"></div>
+  </div>
+</div>
+
+<script>
+const EXAMPLE = {
+  "conditions": [
+    {
+      "name_user": "POTS",
+      "name_display": "Postural Orthostatic Tachycardia Syndrome",
+      "icd11_code": null,
+      "icd11_uri": null,
+      "status": "active",
+      "is_unresolved": false
+    },
+    {
+      "name_user": "anxiety",
+      "name_display": "Anxiety Disorder",
+      "icd11_code": null,
+      "icd11_uri": null,
+      "status": "active",
+      "is_unresolved": false
+    }
+  ],
+  "medications": [
+    {
+      "name_user": "metoprolol 25mg",
+      "name_generic": "metoprolol",
+      "rxnorm_id": null,
+      "drug_class_epc": null,
+      "dose": "25mg",
+      "frequency": "daily",
+      "affects_hrv_hr": null,
+      "is_unresolved": false
+    },
+    {
+      "name_user": "sertraline 50mg",
+      "name_generic": "sertraline",
+      "rxnorm_id": null,
+      "drug_class_epc": null,
+      "dose": "50mg",
+      "frequency": "daily",
+      "affects_hrv_hr": null,
+      "is_unresolved": false
+    }
+  ],
+  "symptoms": [
+    {
+      "name_user": "constantly exhausted",
+      "name_display": "Fatigue",
+      "cluster": "fatigue",
+      "duration_hint": "chronic",
+      "is_unresolved": false
+    },
+    {
+      "name_user": "brain fog",
+      "name_display": "Cognitive Impairment",
+      "cluster": "cognitive",
+      "duration_hint": "chronic",
+      "is_unresolved": false
+    }
+  ]
+};
+
+function loadExample() {
+  document.getElementById('input-json').value = JSON.stringify(EXAMPLE, null, 2);
+}
+
+function clearAll() {
+  document.getElementById('input-json').value = '';
+  document.getElementById('raw-json').textContent = '';
+  document.getElementById('raw-json').style.display = 'none';
+  document.getElementById('raw-placeholder').style.display = 'block';
+  document.getElementById('raw-btn').style.display = 'none';
+  document.getElementById('output-panel').classList.remove('visible');
+  document.getElementById('results-grid').innerHTML = '';
+  document.getElementById('status').textContent = '';
+  document.getElementById('status').className = 'status';
+  document.getElementById('meta-info').textContent = '';
+}
+
+function toggleRaw() {
+  const pre = document.getElementById('raw-json');
+  const btn = document.getElementById('raw-btn');
+  const visible = pre.style.display === 'block';
+  pre.style.display = visible ? 'none' : 'block';
+  btn.textContent = visible ? 'show raw' : 'hide raw';
+}
+
+function setStatus(msg, type='') {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status ' + type;
+}
+
+async function enrich() {
+  const url = document.getElementById('service-url').value.trim().replace(/\/$/, '');
+  const raw  = document.getElementById('input-json').value.trim();
+
+  if (!url) { setStatus('⚠ set service URL first', 'error'); return; }
+  if (!raw)  { setStatus('⚠ paste JSON input first', 'error'); return; }
+
+  let payload;
+  try { payload = JSON.parse(raw); }
+  catch(e) { setStatus('⚠ invalid JSON: ' + e.message, 'error'); return; }
+
+  const btn = document.getElementById('enrich-btn');
+  const btnText = document.getElementById('btn-text');
+  btn.disabled = true;
+  btnText.innerHTML = '<span class="spinner"></span> Enriching…';
+  setStatus('calling ' + url + '/enrich …', 'loading');
+
+  const t0 = Date.now();
+  try {
+    const res = await fetch(url + '/enrich', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + res.statusText);
+    const data = await res.json();
+    const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+
+    // Raw pane
+    document.getElementById('raw-json').textContent = JSON.stringify(data, null, 2);
+    document.getElementById('raw-json').style.display = 'none';
+    document.getElementById('raw-placeholder').style.display = 'none';
+    document.getElementById('raw-btn').style.display = 'inline-flex';
+    document.getElementById('raw-btn').textContent = 'show raw';
+
+    // Meta
+    const meta = data._enrichment_meta || {};
+    document.getElementById('meta-info').textContent =
+      (meta.icd11_release ? 'ICD-11 ' + meta.icd11_release : '') +
+      (meta.icd11_available ? ' · API ✓' : ' · API ✗');
+
+    renderResults(data);
+    setStatus('✓ enriched in ' + elapsed + 's', 'ok');
+
+  } catch(e) {
+    setStatus('✗ ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btnText.textContent = 'Enrich';
+  }
+}
+
+function badge(text, cls, title='') {
+  return `<span class="badge badge-${cls}" title="${title}">${text}</span>`;
+}
+
+function renderResults(data) {
+  const grid = document.getElementById('results-grid');
+  grid.innerHTML = '';
+
+  const sections = [
+    { key: 'conditions', label: 'Conditions', render: renderCondition },
+    { key: 'medications', label: 'Medications', render: renderMedication },
+    { key: 'symptoms',   label: 'Symptoms',   render: renderSymptom },
+  ];
+
+  sections.forEach(({ key, label, render }) => {
+    const items = data[key] || [];
+    if (!items.length) return;
+
+    const col = document.createElement('div');
+    col.innerHTML = `<div class="section-title">${label} <span style="color:var(--accent)">${items.length}</span></div>`;
+    const cards = document.createElement('div');
+    cards.className = 'cards';
+    items.forEach((item, i) => {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.style.animationDelay = (i * 60) + 'ms';
+      card.innerHTML = render(item);
+      cards.appendChild(card);
+    });
+    col.appendChild(cards);
+    grid.appendChild(col);
+  });
+
+  document.getElementById('output-panel').classList.add('visible');
+}
+
+function renderCondition(c) {
+  const resolved = c.icd11_code && !c.is_unresolved;
+  let html = `<div class="card-name">
+    ${esc(c.name_display || c.name_user)}
+    <span class="card-user">"${esc(c.name_user)}"</span>
+  </div>`;
+
+  html += '<div class="badges">';
+  if (c.icd11_code)  html += badge(c.icd11_code, 'code', 'ICD-11 code');
+  if (c.status)      html += badge(c.status, c.status === 'active' ? 'ok' : 'atc');
+  if (c.is_unresolved) html += badge('unresolved', 'unres');
+  html += '</div>';
+
+  if (c.icd11_definition) {
+    const short = c.icd11_definition.length > 280
+      ? c.icd11_definition.slice(0, 280) + '…'
+      : c.icd11_definition;
+    html += `<div class="card-def">${esc(short)}</div>`;
+  }
+
+  if (c.icd11_index_terms && c.icd11_index_terms.length) {
+    html += `<div class="index-terms">${c.icd11_index_terms.slice(0,6).map(t => `<span class="index-term">${esc(t)}</span>`).join('')}</div>`;
+  }
+
+  if (c.icd11_browser_url) {
+    html += `<a class="icd-link" href="${c.icd11_browser_url}" target="_blank">↗ ICD-11 Browser</a>`;
+  }
+
+  return html;
+}
+
+function renderMedication(m) {
+  let html = `<div class="card-name">
+    ${esc(m.name_generic || m.name_user)}
+    <span class="card-user">"${esc(m.name_user)}"</span>
+  </div>`;
+
+  html += '<div class="badges">';
+  if (m.rxnorm_id)      html += badge('RxNorm ' + m.rxnorm_id, 'code');
+  if (m.drug_class_epc) html += badge(m.drug_class_epc, 'class');
+  if (m.affects_hrv_hr) html += badge('⚡ affects HRV/HR', 'hrv');
+  if (m.atc_code)       html += badge('ATC ' + m.atc_code, 'atc');
+  if (m.dose)           html += badge(m.dose, 'atc');
+  if (m.frequency)      html += badge(m.frequency, 'atc');
+  if (m.is_unresolved)  html += badge('unresolved', 'unres');
+  html += '</div>';
+
+  if (m.brand_names && m.brand_names.length) {
+    html += `<div class="brands">Brands: <span>${m.brand_names.join(', ')}</span></div>`;
+  }
+  if (m.schedule) {
+    html += `<div class="brands">Schedule: <span>${esc(m.schedule)}</span></div>`;
+  }
+
+  return html;
+}
+
+function renderSymptom(s) {
+  let html = `<div class="card-name">
+    ${esc(s.name_display || s.name_user)}
+    <span class="card-user">"${esc(s.name_user)}"</span>
+  </div>`;
+
+  html += '<div class="badges">';
+  if (s.icd11_code)    html += badge(s.icd11_code, 'code', 'ICD-11 code');
+  if (s.cluster)       html += badge(s.cluster, 'class');
+  if (s.duration_hint) html += badge(s.duration_hint, 'atc');
+  if (s._resolution && s._resolution.startsWith('cluster_fallback'))
+                        html += badge('cluster fallback', 'unres');
+  if (s.is_unresolved) html += badge('unresolved', 'unres');
+  html += '</div>';
+
+  if (s.icd11_definition) {
+    const short = s.icd11_definition.length > 200
+      ? s.icd11_definition.slice(0, 200) + '…'
+      : s.icd11_definition;
+    html += `<div class="card-def">${esc(short)}</div>`;
+  }
+
+  if (s.icd11_browser_url) {
+    html += `<a class="icd-link" href="${s.icd11_browser_url}" target="_blank">↗ ICD-11 Browser</a>`;
+  }
+
+  return html;
+}
+
+function esc(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+// Restore URL from localStorage
+const savedUrl = localStorage.getItem('enrichment_url');
+if (savedUrl) document.getElementById('service-url').value = savedUrl;
+document.getElementById('service-url').addEventListener('input', e => {
+  localStorage.setItem('enrichment_url', e.target.value);
+});
+</script>
+</body>
+</html>
