@@ -688,8 +688,9 @@ function esc(str) {
 }
 
 // Restore URL from localStorage
-const savedUrl = localStorage.getItem('enrichment_url');
-if (savedUrl) document.getElementById('service-url').value = savedUrl;
+const DEFAULT_URL = 'https://web-production-6e746.up.railway.app';
+const savedUrl = localStorage.getItem('enrichment_url') || DEFAULT_URL;
+document.getElementById('service-url').value = savedUrl;
 document.getElementById('service-url').addEventListener('input', e => {
   localStorage.setItem('enrichment_url', e.target.value);
 });
