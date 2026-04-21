@@ -6,6 +6,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import os
 from typing import Optional
 
 # ── logging ──────────────────────────────────────────────────────────────────
@@ -27,8 +28,8 @@ app.add_middleware(
 )
 
 # ── credentials ───────────────────────────────────────────────────────────────
-ICD11_CLIENT_ID     = "4df4a7e6-1f0b-473b-a17c-c9dc0ba21edf_ea4c313d-5e44-46b8-9bf4-6b7978407738"
-ICD11_CLIENT_SECRET = "c9gfeNQT6CdDuL40NxXD5/md0OlNeka5uUEX5l5hTXw="
+ICD11_CLIENT_ID     = os.environ.get("ICD11_CLIENT_ID", "")
+ICD11_CLIENT_SECRET = os.environ.get("ICD11_CLIENT_SECRET", "")
 
 RXNORM_BASE      = "https://rxnav.nlm.nih.gov/REST"
 ICD11_TOKEN_URL  = "https://icdaccessmanagement.who.int/connect/token"
