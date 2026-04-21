@@ -61,9 +61,30 @@ textarea#input-json::placeholder { color:var(--muted); }
 .item-name { font-size:16px; font-weight:500; margin-bottom:2px; }
 .item-meta { font-size:13px; color:var(--muted); }
 .item-action { color:#636366; padding:4px; flex-shrink:0; }
+.item-chevron { color:#636366; padding:4px 0 4px 4px; flex-shrink:0; }
+
+/* detail popup */
+.detail-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:200; justify-content:center; align-items:flex-end; }
+.detail-overlay.visible { display:flex; }
+.detail-sheet { background:#1c1c1e; border-radius:20px 20px 0 0; width:390px; max-height:88vh; overflow-y:auto; padding:20px 0 48px; animation:slideUp .25s ease; position:relative; }
+.detail-handle { width:36px; height:4px; background:#3a3a3c; border-radius:2px; margin:0 auto 16px; }
+.detail-close { position:absolute; top:8px; right:16px; background:#2c2c2e; border:none; color:#8e8e93; border-radius:50%; width:30px; height:30px; font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+.detail-name { font-size:22px; font-weight:700; padding:0 20px 4px; }
+.detail-user { font-size:13px; color:#8e8e93; padding:0 20px 16px; font-style:italic; }
+.detail-section { padding:0 20px; margin-bottom:16px; }
+.detail-section-label { font-size:11px; color:#8e8e93; text-transform:uppercase; letter-spacing:.05em; margin-bottom:8px; }
+.detail-row { display:flex; justify-content:space-between; align-items:flex-start; padding:10px 0; border-bottom:1px solid #2c2c2e; gap:12px; }
+.detail-row:last-child { border-bottom:none; }
+.detail-row-key { font-size:14px; color:#8e8e93; flex-shrink:0; }
+.detail-row-val { font-size:14px; color:#fff; text-align:right; word-break:break-word; max-width:220px; }
+.detail-code { font-family:monospace; font-size:13px; color:#0a84ff; }
+.detail-def { font-size:13px; color:#c7c7cc; line-height:1.6; margin-top:4px; }
+.detail-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+.detail-tag { background:#2c2c2e; border-radius:12px; padding:4px 10px; font-size:12px; color:#8e8e93; }
+.detail-badge { display:inline-flex; align-items:center; gap:4px; background:rgba(255,59,48,.12); border:1px solid rgba(255,59,48,.25); border-radius:12px; padding:4px 10px; font-size:12px; color:#ff3b30; }
 
 /* clarification */
-.clar-block { margin:16px 16px 4px; background:var(--surface); border-radius:14px; padding:16px; display:none; animation:fadeUp .3s ease; }
+.clar-block { margin:16px 16px 4px; background:#001f4d; border:1px solid rgba(10,132,255,.3); border-radius:14px; padding:16px; display:none; animation:fadeUp .3s ease; }
 .clar-block.visible { display:block; }
 .clar-q { font-size:15px; font-weight:600; margin-bottom:3px; }
 .clar-hint { font-size:13px; color:var(--muted); margin-bottom:14px; }
@@ -256,7 +277,7 @@ function render(data) {
   condL.innerHTML = '';
   if (conditions.length) {
     condS.style.display = 'block';
-    conditions.forEach((c,i) => condL.appendChild(card(c.name_display||c.name_user, [c.icd11_code?'ICD-11 · '+c.icd11_code:null, c.status].filter(Boolean).join(' · '), false, i*50)));
+    conditions.forEach((c,i) => condL.appendChild(card(c.name_display||c.name_user, [c.icd11_code?'ICD-11 · '+c.icd11_code:null, c.status].filter(Boolean).join(' · '), false, i*50, c)));
   } else condS.style.display = 'none';
 
   // — Symptoms —
@@ -265,7 +286,7 @@ function render(data) {
   symL.innerHTML = '';
   if (symptoms.length) {
     symS.style.display = 'block';
-    symptoms.forEach((s,i) => symL.appendChild(card(s.name_display||s.name_user, [s.cluster, s.duration_hint].filter(Boolean).join(' · '), false, i*50)));
+    symptoms.forEach((s,i) => symL.appendChild(card(s.name_display||s.name_user, [s.cluster, s.duration_hint].filter(Boolean).join(' · '), false, i*50, s)));
   } else symS.style.display = 'none';
 
   // — Medications —
@@ -281,36 +302,38 @@ function render(data) {
   if (medications.length) {
     medS.style.display = 'block';
     // main: only HRV-affecting
-    if (hrv.length) hrv.forEach((m,i) => medL.appendChild(card(cap(m.name_generic||m.name_user), meta(m), true, i*50)));
+    if (hrv.length) hrv.forEach((m,i) => medL.appendChild(card(cap(m.name_generic||m.name_user), meta(m), true, i*50, m)));
     else { const p=document.createElement('div'); p.className='empty-note'; p.textContent='No HRV-affecting medications.'; medL.appendChild(p); }
     // modal hrv
     document.getElementById('modal-hrv-section').style.display = hrv.length ? 'block' : 'none';
-    hrv.forEach(m => mHrv.appendChild(card(cap(m.name_generic||m.name_user), meta(m), true)));
+    hrv.forEach(m => mHrv.appendChild(card(cap(m.name_generic||m.name_user), meta(m), true, 0, m)));
     // modal other
     document.getElementById('modal-other-section').style.display = other.length ? 'block' : 'none';
-    other.forEach(m => mOther.appendChild(card(cap(m.name_generic||m.name_user), meta(m), false)));
+    other.forEach(m => mOther.appendChild(card(cap(m.name_generic||m.name_user), meta(m), false, 0, m)));
   } else medS.style.display = 'none';
 
   // — Log —
   const logBlock = document.getElementById('log-block');
   const logBubble = document.getElementById('log-bubble');
   const stripped = stripFences(_rawInput);
-  logBubble.textContent = stripped.length > 800 ? stripped.slice(0,800)+'…' : stripped;
+  logBubble.textContent = stripped;
   logBlock.classList.add('visible');
 }
 
-function card(name, metaText, dot, delay=0) {
+function card(name, metaText, dot, delay=0, clickData=null) {
   const el = document.createElement('div');
   el.className = 'item-card';
   el.style.animationDelay = delay + 'ms';
+  if (clickData) el.style.cursor = 'pointer';
   el.innerHTML = `
     <div class="item-dot${dot?'':' hidden'}"></div>
     <div class="item-info">
       <div class="item-name">${esc(name)}</div>
       ${metaText ? `<div class="item-meta">${esc(metaText)}</div>` : ''}
     </div>
-    <div class="item-action"><svg width="15" height="17" viewBox="0 0 16 18" fill="none"><path d="M1 4h14M5 4V2h6v2M6 8v6M10 8v6M2 4l1 12h10L14 4H2z" stroke="#636366" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    <div class="item-chevron"><svg width="8" height="13" viewBox="0 0 8 13" fill="none"><path d="M1 1l6 5.5L1 12" stroke="#636366" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
   `;
+  if (clickData) el.addEventListener('click', () => openDetail(clickData));
   return el;
 }
 
@@ -335,6 +358,58 @@ const ABBR = {
 };
 function abbr(cls) { return cls ? (ABBR[cls] || cls) : null; }
 function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+function openDetail(data) {
+  document.getElementById('detail-overlay').classList.add('visible');
+  const content = document.getElementById('detail-content');
+  let html = '';
+  html += `<div class="detail-name">${esc(data.name_display || data.name_generic || data.name_user || '')}</div>`;
+  if (data.name_user) html += `<div class="detail-user">"${esc(data.name_user)}"</div>`;
+
+  const codeFields = [];
+  if (data.icd11_code)   codeFields.push(['ICD-11 Code', `<span class="detail-code">${esc(data.icd11_code)}</span>`]);
+  if (data.icd11_name && data.icd11_name !== (data.name_display||'')) codeFields.push(['ICD-11 Name', esc(data.icd11_name)]);
+  if (data.rxnorm_id)    codeFields.push(['RxNorm ID', `<span class="detail-code">${esc(data.rxnorm_id)}</span>`]);
+  if (data.atc_code)     codeFields.push(['ATC Code', `<span class="detail-code">${esc(data.atc_code)}</span>`]);
+  if (data.snomed_code)  codeFields.push(['SNOMED', `<span class="detail-code">${esc(data.snomed_code)}</span>`]);
+  if (data.drugbank_id)  codeFields.push(['DrugBank', `<span class="detail-code">${esc(data.drugbank_id)}</span>`]);
+  if (codeFields.length) {
+    html += `<div class="detail-section"><div class="detail-section-label">Codes</div>`;
+    codeFields.forEach(([k,v]) => html += `<div class="detail-row"><span class="detail-row-key">${k}</span><span class="detail-row-val">${v}</span></div>`);
+    html += `</div>`;
+  }
+
+  const detFields = [];
+  if (data.status)            detFields.push(['Status', esc(data.status)]);
+  if (data.drug_class_epc)    detFields.push(['Drug Class', esc(data.drug_class_epc)]);
+  if (data.dose)              detFields.push(['Dose', esc(data.dose)]);
+  if (data.frequency)         detFields.push(['Frequency', esc(data.frequency)]);
+  if (data.schedule)          detFields.push(['Schedule', esc(data.schedule)]);
+  if (data.cluster)           detFields.push(['Cluster', esc(data.cluster)]);
+  if (data.duration_hint)     detFields.push(['Duration', esc(data.duration_hint)]);
+  if (data.affects_hrv_hr)    detFields.push(['HRV/HR effect', '<span class="detail-badge">⚡ affects HRV & Heart Rate</span>']);
+  if (detFields.length) {
+    html += `<div class="detail-section"><div class="detail-section-label">Details</div>`;
+    detFields.forEach(([k,v]) => html += `<div class="detail-row"><span class="detail-row-key">${k}</span><span class="detail-row-val">${v}</span></div>`);
+    html += `</div>`;
+  }
+
+  if (data.icd11_definition) {
+    html += `<div class="detail-section"><div class="detail-section-label">Definition</div><div class="detail-def">${esc(data.icd11_definition)}</div></div>`;
+  }
+  if (data.brand_names && data.brand_names.length) {
+    html += `<div class="detail-section"><div class="detail-section-label">Brand Names</div><div class="detail-tags">${data.brand_names.map(b=>`<span class="detail-tag">${esc(b)}</span>`).join('')}</div></div>`;
+  }
+  if (data.icd11_index_terms && data.icd11_index_terms.length) {
+    html += `<div class="detail-section"><div class="detail-section-label">Also known as</div><div class="detail-tags">${data.icd11_index_terms.slice(0,12).map(t=>`<span class="detail-tag">${esc(t)}</span>`).join('')}</div></div>`;
+  }
+  if (data.icd11_browser_url) {
+    html += `<div class="detail-section"><a href="${data.icd11_browser_url}" target="_blank" style="color:#0a84ff;font-size:14px;text-decoration:none;">↗ Open in ICD-11 Browser</a></div>`;
+  }
+  content.innerHTML = html;
+}
+function closeDetail() { document.getElementById('detail-overlay').classList.remove('visible'); }
+function closeDetailModal(e) { if (e.target===document.getElementById('detail-overlay')) closeDetail(); }
+
 function esc(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
 
 function openAllMeds() { document.getElementById('modal-overlay').classList.add('visible'); }
@@ -345,5 +420,13 @@ const DEFAULT_URL = 'https://web-production-6e746.up.railway.app';
 document.getElementById('service-url').value = localStorage.getItem('enrichment_url') || DEFAULT_URL;
 document.getElementById('service-url').addEventListener('input', e => localStorage.setItem('enrichment_url', e.target.value));
 </script>
+<!-- DETAIL MODAL -->
+<div class="detail-overlay" id="detail-overlay" onclick="closeDetailModal(event)">
+  <div class="detail-sheet">
+    <div class="detail-handle"></div>
+    <button class="detail-close" onclick="closeDetail()">✕</button>
+    <div id="detail-content"></div>
+  </div>
+</div>
 </body>
 </html>
