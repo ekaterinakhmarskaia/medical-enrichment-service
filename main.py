@@ -7,7 +7,7 @@ import urllib.parse
 import urllib.request
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 # ── credentials from environment variables ────────────────────────────────────
@@ -309,10 +309,14 @@ class ICD11Client:
             if bad in title:
                 score -= 30
 
-        # Strongly penalise substance-induced / etiological secondary conditions
+        # Strongly penalise substance-induced / etiological / complication-after-event titles.
+        # These are highly specific secondary codes that almost never match
+        # what a user typing plain language means.
         for bad in ("induced by", "due to", "caused by", "associated with",
                     "related to", "in the context of", "substance",
-                    "multiple specified", "single specified", "psychoactive"):
+                    "multiple specified", "single specified", "psychoactive",
+                    "following", "complication", "as current", "after acute",
+                    "myocardial infarction", "postprocedural", "post-procedural"):
             if bad in title:
                 score -= 50
 
@@ -612,16 +616,41 @@ def root():
 def health():
     return {"status": "ok"}
 
+def _strip_markdown(raw: str) -> str:
+    """Strip ```json ... ``` or ``` ... ``` fences if present."""
+    s = raw.strip()
+    if s.startswith("```"):
+        # remove opening fence (```json or ```)
+        s = s[s.index("\n") + 1:] if "\n" in s else s[3:]
+        # remove closing fence
+        if s.rstrip().endswith("```"):
+            s = s.rstrip()[:-3]
+    return s.strip()
+
+
 @app.post("/enrich")
-def enrich(payload: dict):
+async def enrich(request: Request):
     """
     Enriches Health Profile JSON.
 
-    Send the raw JSON object from Cortex as the request body.
+    Accepts:
+    - application/json body (plain JSON object)
+    - text/plain body (raw JSON string, possibly wrapped in ```json ... ``` fences)
+
     Returns the same structure with medical codes added to each entity.
     """
     try:
+        body = await request.body()
+        text = body.decode("utf-8").strip()
+
+        # Strip markdown code fences if present (Cortex sometimes wraps output)
+        text = _strip_markdown(text)
+
+        payload = json.loads(text)
         return service.enrich(payload)
+    except json.JSONDecodeError as e:
+        log.error("JSON parse failed: %s", e)
+        raise HTTPException(status_code=422, detail=f"Invalid JSON: {e}")
     except Exception as e:
         log.error("Enrichment failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
