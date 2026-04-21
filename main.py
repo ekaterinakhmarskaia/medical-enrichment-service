@@ -1,36 +1,28 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+import os
 import json
 import logging
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-import os
 from typing import Optional
 
-# ── logging ──────────────────────────────────────────────────────────────────
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-8s %(message)s", datefmt="%H:%M:%S")
-log = logging.getLogger(__name__)
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
-# ── FastAPI app ───────────────────────────────────────────────────────────────
-app = FastAPI(
-    title="Medical Enrichment Service",
-    description="Enriches medical profile JSON with ICD-11 and RxNorm codes. Input: parsed Health Profile JSON from Cortex. Output: same JSON enriched with medical codes.",
-    version="1.0.0",
-)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# ── credentials ───────────────────────────────────────────────────────────────
+# ── credentials from environment variables ────────────────────────────────────
 ICD11_CLIENT_ID     = os.environ.get("ICD11_CLIENT_ID", "")
 ICD11_CLIENT_SECRET = os.environ.get("ICD11_CLIENT_SECRET", "")
 
+# ── logging ───────────────────────────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s  %(levelname)-8s  %(message)s",
+    datefmt="%H:%M:%S",
+)
+log = logging.getLogger(__name__)
+
+# ── API constants ─────────────────────────────────────────────────────────────
 RXNORM_BASE      = "https://rxnav.nlm.nih.gov/REST"
 ICD11_TOKEN_URL  = "https://icdaccessmanagement.who.int/connect/token"
 ICD11_SEARCH_URL = "https://id.who.int/icd/release/11/2024-01/mms/search"
@@ -50,231 +42,508 @@ CLUSTER_FALLBACK = {
 }
 
 HRV_HR_CLASSES = {
-    "Beta-Adrenergic Blocker","Antiarrhythmic","Cardiac Glycoside",
-    "Selective Serotonin Reuptake Inhibitor","Serotonin and Norepinephrine Reuptake Inhibitor",
-    "Tricyclic Antidepressant","Norepinephrine-Dopamine Reuptake Inhibitor",
-    "Noradrenergic and Specific Serotonergic Antidepressant","Serotonin Modulator",
-    "Atypical Antipsychotic","Typical Antipsychotic","Mood Stabilizer","Benzodiazepine",
-    "Anxiolytic","Sedative Hypnotic","Melatonin Receptor Agonist","Orexin Receptor Antagonist",
-    "Central Nervous System Stimulant","Norepinephrine Reuptake Inhibitor",
-    "Thyroid Hormone","Antithyroid Agent","Estrogen","Progestin","Androgen",
-    "Alpha-1 Adrenergic Agonist","Alpha-Adrenergic Agonist","Central Alpha-2 Adrenergic Agonist",
-    "Alpha-1 Adrenergic Blocker","Calcium Channel Blocker",
-    "Angiotensin-Converting Enzyme Inhibitor","Angiotensin II Receptor Blocker",
-    "Serotonin-1 Receptor Agonist","Short-Acting Beta-2 Agonist","Long-Acting Beta-2 Agonist",
-    "Dopamine Receptor Agonist","Dopamine Precursor","Monoamine Oxidase Inhibitor",
-    "Acetylcholinesterase Inhibitor","Opioid Analgesic","Fluoroquinolone Antibacterial",
-    "Macrolide Antibacterial","Phosphodiesterase-5 Inhibitor","Beta-3 Adrenergic Agonist",
-    "Muscarinic Antagonist","Dopamine Antagonist","Serotonin-3 Receptor Antagonist",
-    "Methylxanthine","Histamine-1 Receptor Antagonist","Somatostatin Analog",
+    "Beta-Adrenergic Blocker", "Antiarrhythmic", "Cardiac Glycoside",
+    "Selective Serotonin Reuptake Inhibitor",
+    "Serotonin and Norepinephrine Reuptake Inhibitor",
+    "Tricyclic Antidepressant", "Norepinephrine-Dopamine Reuptake Inhibitor",
+    "Noradrenergic and Specific Serotonergic Antidepressant",
+    "Serotonin Modulator", "Atypical Antipsychotic", "Typical Antipsychotic",
+    "Mood Stabilizer", "Benzodiazepine", "Anxiolytic", "Sedative Hypnotic",
+    "Melatonin Receptor Agonist", "Orexin Receptor Antagonist",
+    "Central Nervous System Stimulant", "Norepinephrine Reuptake Inhibitor",
+    "Histamine-3 Receptor Antagonist", "Thyroid Hormone", "Antithyroid Agent",
+    "Estrogen", "Progestin", "Androgen",
+    "Alpha-1 Adrenergic Agonist", "Alpha-Adrenergic Agonist",
+    "Central Alpha-2 Adrenergic Agonist", "Alpha-1 Adrenergic Blocker",
+    "Calcium Channel Blocker",
+    "Angiotensin-Converting Enzyme Inhibitor",
+    "Angiotensin II Receptor Blocker",
+    "Hyperpolarization-Activated Cyclic Nucleotide-Gated Channel Blocker",
+    "Serotonin-1 Receptor Agonist",
+    "Short-Acting Beta-2 Agonist", "Long-Acting Beta-2 Agonist",
+    "Dopamine Receptor Agonist", "Dopamine Precursor",
+    "Monoamine Oxidase Inhibitor", "Acetylcholinesterase Inhibitor",
+    "Opioid Analgesic", "Fluoroquinolone Antibacterial",
+    "Macrolide Antibacterial", "Phosphodiesterase-5 Inhibitor",
+    "Beta-3 Adrenergic Agonist", "Muscarinic Antagonist",
+    "Dopamine Antagonist", "Serotonin-3 Receptor Antagonist",
+    "Methylxanthine", "Histamine-1 Receptor Antagonist", "Somatostatin Analog",
 }
 
 # ── HTTP helpers ──────────────────────────────────────────────────────────────
-def _http_get(url, headers=None, timeout=8):
+def _http_get(url: str, headers: dict = None, timeout: int = 8) -> Optional[dict]:
     req = urllib.request.Request(url, headers=headers or {})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        log.warning("HTTP %s: %s", e.code, url)
     except Exception as e:
-        log.warning("GET failed %s: %s", url, e)
+        log.warning("Request failed: %s", e)
     return None
 
-def _http_post_form(url, data, timeout=10):
+def _http_post_form(url: str, data: dict, timeout: int = 10) -> Optional[dict]:
     body = urllib.parse.urlencode(data).encode()
     req  = urllib.request.Request(url, data=body, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode())
     except Exception as e:
-        log.warning("POST failed %s: %s", url, e)
+        log.warning("POST failed: %s", e)
     return None
 
-def _extract_str(obj):
-    if isinstance(obj, str): return obj
-    if isinstance(obj, dict): return obj.get("@value")
+def _extract_str(obj) -> Optional[str]:
+    if isinstance(obj, str):   return obj
+    if isinstance(obj, dict):  return obj.get("@value")
     return None
 
-# ── RxNorm ───────────────────────────────────────────────────────────────────
+# ── RxNorm client ─────────────────────────────────────────────────────────────
 class RxNormClient:
     DELAY = 0.05
-    def __init__(self): self._cache = {}
 
-    def _get_rxcui(self, name):
+    def __init__(self):
+        self._cache: dict = {}
+
+    def _get_rxcui(self, name: str) -> Optional[str]:
         time.sleep(self.DELAY)
         params = urllib.parse.urlencode({"name": name, "search": 2})
-        data = _http_get(f"{RXNORM_BASE}/rxcui.json?{params}")
+        data   = _http_get(f"{RXNORM_BASE}/rxcui.json?{params}")
         if data:
             ids = data.get("idGroup", {}).get("rxnormId", [])
             if ids: return ids[0]
         time.sleep(self.DELAY)
         params = urllib.parse.urlencode({"term": name, "maxEntries": 1})
-        data = _http_get(f"{RXNORM_BASE}/approximateTerm.json?{params}")
+        data   = _http_get(f"{RXNORM_BASE}/approximateTerm.json?{params}")
         if data:
             candidates = data.get("approximateGroup", {}).get("candidate", [])
             if candidates: return candidates[0].get("rxcui")
         return None
 
-    def _to_ingredient_rxcui(self, rxcui):
+    def _to_ingredient_rxcui(self, rxcui: str) -> str:
         time.sleep(self.DELAY)
         params = urllib.parse.urlencode({"tty": "IN"})
-        data = _http_get(f"{RXNORM_BASE}/rxcui/{rxcui}/related.json?{params}")
+        data   = _http_get(f"{RXNORM_BASE}/rxcui/{rxcui}/related.json?{params}")
         if data:
             for g in data.get("relatedGroup", {}).get("conceptGroup", []):
                 props = g.get("conceptProperties", [])
                 if props: return props[0]["rxcui"]
         return rxcui
 
-    def _get_epc(self, rxcui):
+    def _get_property(self, rxcui: str, prop_name: str) -> Optional[str]:
+        time.sleep(self.DELAY)
+        params = urllib.parse.urlencode({"propName": prop_name})
+        data   = _http_get(f"{RXNORM_BASE}/rxcui/{rxcui}/property.json?{params}")
+        if data:
+            props = data.get("propConceptGroup", {}).get("propConcept", [])
+            for p in props:
+                if p.get("propName") == prop_name: return p.get("propValue")
+            if props: return props[0].get("propValue")
+        return None
+
+    def _get_all_codes(self, rxcui: str) -> dict:
+        time.sleep(self.DELAY)
+        params = urllib.parse.urlencode({"prop": "codes"})
+        data   = _http_get(f"{RXNORM_BASE}/rxcui/{rxcui}/allProperties.json?{params}")
+        result = {}
+        if data:
+            for p in data.get("propConceptGroup", {}).get("propConcept", []):
+                name = p.get("propName", "")
+                val  = p.get("propValue")
+                if name and val:
+                    if name not in result:              result[name] = val
+                    elif isinstance(result[name], list): result[name].append(val)
+                    else:                               result[name] = [result[name], val]
+        return result
+
+    def _get_all_attributes(self, rxcui: str) -> dict:
+        time.sleep(self.DELAY)
+        params = urllib.parse.urlencode({"prop": "attributes"})
+        data   = _http_get(f"{RXNORM_BASE}/rxcui/{rxcui}/allProperties.json?{params}")
+        result = {}
+        if data:
+            for p in data.get("propConceptGroup", {}).get("propConcept", []):
+                name = p.get("propName", "")
+                val  = p.get("propValue")
+                if name and val: result[name] = val
+        return result
+
+    def _get_epc(self, rxcui: str) -> Optional[str]:
         time.sleep(self.DELAY)
         params = urllib.parse.urlencode({"rxcui": rxcui, "relaSource": "FDASPL", "relas": "has_EPC"})
-        data = _http_get(f"{RXNORM_BASE}/rxclass/class/byRxcui.json?{params}")
+        data   = _http_get(f"{RXNORM_BASE}/rxclass/class/byRxcui.json?{params}")
         if data:
             for item in data.get("rxclassDrugInfoList", {}).get("rxclassDrugInfo", []):
                 cls = item.get("rxclassMinConceptItem", {})
                 if cls.get("classType") == "EPC": return cls.get("className")
         return None
 
-    def resolve(self, name_generic):
+    def _get_brand_names(self, rxcui: str) -> list:
+        time.sleep(self.DELAY)
+        params = urllib.parse.urlencode({"tty": "BN"})
+        data   = _http_get(f"{RXNORM_BASE}/rxcui/{rxcui}/related.json?{params}")
+        brands = []
+        if data:
+            for g in data.get("relatedGroup", {}).get("conceptGroup", []):
+                for c in g.get("conceptProperties", []):
+                    name = c.get("name")
+                    if name and name not in brands: brands.append(name)
+        return brands[:10]
+
+    def resolve(self, name_generic: str) -> dict:
         key = (name_generic or "").lower().strip()
-        if not key: return {"rxnorm_id": None, "drug_class_epc": None, "affects_hrv_hr": False, "resolved": False}
+        if not key:
+            return {"rxnorm_id": None, "rxnorm_name": None, "drug_class_epc": None,
+                    "atc_code": None, "snomed_code": None, "drugbank_id": None,
+                    "schedule": None, "available_strengths": None, "brand_names": [],
+                    "affects_hrv_hr": False, "resolved": False}
         if key in self._cache: return self._cache[key]
+
+        log.info("RxNorm <- '%s'", name_generic)
         rxcui = self._get_rxcui(name_generic)
         if not rxcui:
-            result = {"rxnorm_id": None, "drug_class_epc": None, "affects_hrv_hr": False, "resolved": False}
+            result = {"rxnorm_id": None, "rxnorm_name": None, "drug_class_epc": None,
+                      "atc_code": None, "snomed_code": None, "drugbank_id": None,
+                      "schedule": None, "available_strengths": None, "brand_names": [],
+                      "affects_hrv_hr": False, "resolved": False}
             self._cache[key] = result
             return result
+
         in_rxcui = self._to_ingredient_rxcui(rxcui)
-        epc = self._get_epc(in_rxcui)
-        affects = epc in HRV_HR_CLASSES if epc else False
-        result = {"rxnorm_id": in_rxcui, "drug_class_epc": epc, "affects_hrv_hr": affects, "resolved": True}
+        codes    = self._get_all_codes(in_rxcui)
+        atc         = codes.get("ATC")
+        snomed_code = codes.get("SNOMEDCT")
+        drugbank_id = codes.get("DRUGBANK")
+        rxnorm_name = codes.get("RxNorm Name") or self._get_property(in_rxcui, "RxNorm Name")
+        attrs       = self._get_all_attributes(in_rxcui)
+        epc         = self._get_epc(in_rxcui)
+        brand_names = self._get_brand_names(in_rxcui)
+        affects     = epc in HRV_HR_CLASSES if epc else False
+
+        log.info("  rxcui=%s  epc=%s  atc=%s  brands=%d", in_rxcui, epc, atc, len(brand_names))
+
+        result = {
+            "rxnorm_id":           in_rxcui,
+            "rxnorm_name":         rxnorm_name,
+            "drug_class_epc":      epc,
+            "atc_code":            atc,
+            "snomed_code":         snomed_code if isinstance(snomed_code, str) else (snomed_code[0] if isinstance(snomed_code, list) else None),
+            "drugbank_id":         drugbank_id,
+            "schedule":            attrs.get("SCHEDULE"),
+            "available_strengths": attrs.get("AVAILABLE_STRENGTH"),
+            "brand_names":         brand_names,
+            "affects_hrv_hr":      affects,
+            "resolved":            True,
+        }
         self._cache[key] = result
         return result
 
-# ── ICD-11 ───────────────────────────────────────────────────────────────────
+# ── ICD-11 client ─────────────────────────────────────────────────────────────
 class ICD11Client:
-    def __init__(self):
-        self._token = None
-        self._expires_at = 0.0
-        self._cache = {}
+    def __init__(self, client_id: str, client_secret: str):
+        self.client_id     = client_id
+        self.client_secret = client_secret
+        self._token:      Optional[str] = None
+        self._expires_at: float         = 0.0
+        self._cache: dict               = {}
 
-    def _get_token(self):
-        if self._token and time.time() < self._expires_at - 60: return self._token
+    def _available(self) -> bool:
+        return bool(self.client_id and self.client_secret
+                    and self.client_id != "YOUR_CLIENT_ID")
+
+    def _get_token(self) -> Optional[str]:
+        if self._token and time.time() < self._expires_at - 60:
+            return self._token
         data = _http_post_form(ICD11_TOKEN_URL, {
-            "client_id": ICD11_CLIENT_ID, "client_secret": ICD11_CLIENT_SECRET,
+            "client_id": self.client_id, "client_secret": self.client_secret,
             "scope": "icdapi_access", "grant_type": "client_credentials",
         })
-        if not data or "access_token" not in data: return None
-        self._token = data["access_token"]
+        if not data or "access_token" not in data:
+            log.warning("ICD-11: failed to obtain token")
+            return None
+        self._token      = data["access_token"]
         self._expires_at = time.time() + data.get("expires_in", 3600)
+        log.info("ICD-11: token obtained")
         return self._token
 
-    def _headers(self):
+    def _headers(self) -> Optional[dict]:
         token = self._get_token()
         if not token: return None
         return {"Authorization": f"Bearer {token}", "Accept": "application/json",
                 "Accept-Language": "en", "API-Version": "v2"}
 
-    def _search_one(self, query, flexisearch, headers):
+    def _search_one(self, query: str, flexisearch: bool, headers: dict) -> Optional[dict]:
         time.sleep(0.1)
-        params = urllib.parse.urlencode({"q": query, "flatResults": "true",
-            "highlightingEnabled": "false", "useFlexisearch": "true" if flexisearch else "false",
-            "medicalCodingMode": "true"})
+        params = urllib.parse.urlencode({
+            "q": query, "flatResults": "true", "highlightingEnabled": "false",
+            "useFlexisearch": "true" if flexisearch else "false", "medicalCodingMode": "true",
+        })
         data = _http_get(f"{ICD11_SEARCH_URL}?{params}", headers=headers, timeout=10)
         if not data: return None
         entities = data.get("destinationEntities", [])
         return entities[0] if entities else None
 
-    def resolve(self, name_display, name_user=None, cluster=None, use_fallback=False):
+    def _get_entity_details(self, entity_uri: str, headers: dict) -> dict:
+        time.sleep(0.1)
+        url = entity_uri.replace("http://", "https://")
+        if "/icd/entity/" in url:
+            entity_id = url.split("/icd/entity/")[-1].rstrip("/")
+            url = f"{ICD11_ENTITY_URL}/{entity_id}"
+
+        data = _http_get(url, headers=headers, timeout=10)
+        if not data: return {}
+        result = {}
+
+        defn = data.get("definition")
+        if defn: result["icd11_definition"] = _extract_str(defn)
+
+        synonyms = []
+        for s in data.get("synonym", []):
+            label = s.get("label") if isinstance(s, dict) else s
+            text  = _extract_str(label) if isinstance(label, dict) else _extract_str(s)
+            if text: synonyms.append(text)
+        if synonyms: result["icd11_synonyms"] = synonyms
+
+        inclusions = []
+        for inc in data.get("inclusion", []):
+            label = inc.get("label") if isinstance(inc, dict) else inc
+            text  = _extract_str(label) if isinstance(label, dict) else _extract_str(inc)
+            if text: inclusions.append(text)
+        if inclusions: result["icd11_inclusions"] = inclusions
+
+        exclusions = []
+        for exc in data.get("exclusion", []):
+            label   = exc.get("label") if isinstance(exc, dict) else exc
+            text    = _extract_str(label) if isinstance(label, dict) else _extract_str(exc)
+            lin_ref = exc.get("linearizationReference") if isinstance(exc, dict) else None
+            entry   = {"label": text} if text else {}
+            if lin_ref: entry["reference"] = lin_ref
+            if entry: exclusions.append(entry)
+        if exclusions: result["icd11_exclusions"] = exclusions
+
+        browser_url = data.get("browserUrl")
+        if browser_url: result["icd11_browser_url"] = browser_url
+
+        index_terms = []
+        for it in data.get("indexTerm", []):
+            label = it.get("label") if isinstance(it, dict) else it
+            text  = _extract_str(label) if isinstance(label, dict) else _extract_str(it)
+            if text and text not in index_terms: index_terms.append(text)
+        if index_terms: result["icd11_index_terms"] = index_terms[:20]
+
+        return result
+
+    def resolve(self, name_display: str, name_user: str = None,
+                cluster: str = None, use_fallback: bool = False,
+                fetch_details: bool = True) -> dict:
         cache_key = (name_display or "").lower().strip()
         if cache_key in self._cache: return self._cache[cache_key]
-        empty = {"icd11_code": None, "icd11_uri": None, "resolved": False}
+
+        empty = {"icd11_code": None, "icd11_uri": None, "icd11_name": None,
+                 "icd11_definition": None, "icd11_synonyms": None,
+                 "icd11_inclusions": None, "icd11_exclusions": None,
+                 "icd11_browser_url": None, "icd11_index_terms": None,
+                 "name_display": name_display, "resolved": False, "resolution": "not_found"}
+
+        if not self._available():
+            empty["resolution"] = "no_credentials"
+            self._cache[cache_key] = empty
+            return empty
+
         headers = self._headers()
-        if not headers: self._cache[cache_key] = empty; return empty
+        if not headers:
+            empty["resolution"] = "token_error"
+            self._cache[cache_key] = empty
+            return empty
 
-        attempts = [(name_display, False), (name_display, True)]
+        attempts = [
+            (name_display, False, "exact/name_display"),
+            (name_display, True,  "flex/name_display"),
+        ]
         if name_user and name_user != name_display:
-            attempts += [(name_user, False), (name_user, True)]
+            attempts += [
+                (name_user, False, "exact/name_user"),
+                (name_user, True,  "flex/name_user"),
+            ]
 
-        for query, flex in attempts:
+        best = None
+        for query, flex, label in attempts:
             if not query: continue
-            result = self._search_one(query, flex, headers)
-            if result:
-                uri = result.get("id", "").replace("http://", "https://")
-                code = result.get("theCode") or None
-                r = {"icd11_code": code, "icd11_uri": uri or None, "resolved": bool(code)}
-                self._cache[cache_key] = r
-                return r
+            log.info("ICD-11 <- '%s' [%s]", query, label)
+            found = self._search_one(query, flex, headers)
+            if found:
+                best = found
+                log.info("  [found] code=%s", found.get("theCode"))
+                break
+            else:
+                log.info("  [empty]")
+
+        if best:
+            uri  = best.get("id", "").replace("http://", "https://")
+            code = best.get("theCode") or None
+            result = {
+                "icd11_code": code, "icd11_uri": uri or None,
+                "icd11_name": best.get("title"),
+                "icd11_definition": None, "icd11_synonyms": None,
+                "icd11_inclusions": None, "icd11_exclusions": None,
+                "icd11_browser_url": None, "icd11_index_terms": None,
+                "name_display": name_display, "resolved": bool(code), "resolution": "api_search",
+            }
+            if fetch_details and uri:
+                result.update(self._get_entity_details(uri, headers))
+            self._cache[cache_key] = result
+            return result
 
         if use_fallback and cluster and cluster in CLUSTER_FALLBACK:
             fb = CLUSTER_FALLBACK[cluster]
-            r = {"icd11_code": fb["icd11_code"], "icd11_uri": fb["icd11_uri"], "resolved": True}
-            self._cache[cache_key] = r
-            return r
+            result = {
+                "icd11_code": fb["icd11_code"], "icd11_uri": fb["icd11_uri"],
+                "icd11_name": fb["note"],
+                "icd11_definition": None, "icd11_synonyms": None,
+                "icd11_inclusions": None, "icd11_exclusions": None,
+                "icd11_browser_url": None, "icd11_index_terms": None,
+                "name_display": name_display, "resolved": True,
+                "resolution": f"cluster_fallback/{cluster}",
+            }
+            if fetch_details:
+                result.update(self._get_entity_details(fb["icd11_uri"], headers))
+            self._cache[cache_key] = result
+            return result
 
         self._cache[cache_key] = empty
         return empty
 
-# ── Service ───────────────────────────────────────────────────────────────────
-rxnorm = RxNormClient()
-icd11  = ICD11Client()
+# ── Enrichment service ────────────────────────────────────────────────────────
+ICD11_FIELDS = [
+    "icd11_code", "icd11_uri", "icd11_name", "icd11_definition",
+    "icd11_synonyms", "icd11_inclusions", "icd11_exclusions",
+    "icd11_browser_url", "icd11_index_terms", "is_unresolved", "_resolution",
+]
 
-def enrich_condition(c):
-    c = dict(c)
-    if c.get("icd11_code"): return c
-    r = icd11.resolve(c.get("name_display") or c.get("name_user", ""), c.get("name_user"))
-    c.update({"icd11_code": r["icd11_code"], "icd11_uri": r["icd11_uri"],
-               "is_unresolved": not r["resolved"]})
-    return c
+class MedicalEnrichmentService:
+    def __init__(self):
+        self.rxnorm = RxNormClient()
+        self.icd11  = ICD11Client(
+            client_id     = ICD11_CLIENT_ID,
+            client_secret = ICD11_CLIENT_SECRET,
+        )
 
-def enrich_medication(m):
-    m = dict(m)
-    if m.get("rxnorm_id"): return m
-    r = rxnorm.resolve(m.get("name_generic") or m.get("name_user", ""))
-    m["rxnorm_id"] = r["rxnorm_id"]
-    m["is_unresolved"] = not r["resolved"]
-    if r["drug_class_epc"]:
-        m["drug_class_epc"] = r["drug_class_epc"]
-        m["affects_hrv_hr"] = r["affects_hrv_hr"]
-    return m
+    def _enrich_condition(self, condition: dict) -> dict:
+        c = dict(condition)
+        if c.get("icd11_code") and c.get("icd11_uri"): return c
+        r = self.icd11.resolve(
+            name_display  = c.get("name_display") or c.get("name_user", ""),
+            name_user     = c.get("name_user"),
+            use_fallback  = False,
+            fetch_details = True,
+        )
+        for field in ICD11_FIELDS:
+            if field in r: c[field] = r[field]
+        c["is_unresolved"] = not r["resolved"]
+        c["_resolution"]   = r.get("resolution")
+        return c
 
-def enrich_symptom(s):
-    s = dict(s)
-    if s.get("icd11_code"): return s
-    r = icd11.resolve(s.get("name_display") or s.get("name_user", ""),
-                      s.get("name_user"), s.get("cluster"), use_fallback=True)
-    s.update({"icd11_code": r["icd11_code"], "icd11_uri": r["icd11_uri"],
-               "is_unresolved": not r["resolved"]})
-    return s
+    def _enrich_medication(self, medication: dict) -> dict:
+        m = dict(medication)
+        if m.get("rxnorm_id"): return m
+        r = self.rxnorm.resolve(m.get("name_generic") or m.get("name_user", ""))
+        m["rxnorm_id"]           = r["rxnorm_id"]
+        m["rxnorm_name"]         = r.get("rxnorm_name")
+        m["atc_code"]            = r.get("atc_code")
+        m["snomed_code"]         = r.get("snomed_code")
+        m["drugbank_id"]         = r.get("drugbank_id")
+        m["schedule"]            = r.get("schedule")
+        m["available_strengths"] = r.get("available_strengths")
+        m["brand_names"]         = r.get("brand_names", [])
+        m["is_unresolved"]       = not r["resolved"]
+        if r["drug_class_epc"]:
+            llm_epc = m.get("drug_class_epc")
+            if llm_epc and llm_epc != r["drug_class_epc"]:
+                log.info("  EPC conflict '%s': llm=%s -> api=%s",
+                         m.get("name_generic"), llm_epc, r["drug_class_epc"])
+            m["drug_class_epc"] = r["drug_class_epc"]
+            m["affects_hrv_hr"] = r["affects_hrv_hr"]
+        return m
 
-# ── Routes ────────────────────────────────────────────────────────────────────
-@app.get("/")
-def root():
-    return {"service": "Medical Enrichment Service", "version": "1.0.0",
-            "docs": "/docs", "usage": "POST /enrich with Health Profile JSON"}
+    def _enrich_symptom(self, symptom: dict) -> dict:
+        s = dict(symptom)
+        if s.get("icd11_code") and s.get("icd11_uri"): return s
+        r = self.icd11.resolve(
+            name_display  = s.get("name_display") or s.get("name_user", ""),
+            name_user     = s.get("name_user"),
+            cluster       = s.get("cluster"),
+            use_fallback  = True,
+            fetch_details = True,
+        )
+        for field in ICD11_FIELDS:
+            if field in r: s[field] = r[field]
+        s["is_unresolved"] = not r["resolved"]
+        s["_resolution"]   = r.get("resolution")
+        return s
 
-@app.post("/enrich")
-def enrich(payload: dict):
-    """
-    Enriches Health Profile JSON with ICD-11 and RxNorm codes.
-
-    Input: JSON from Cortex (conditions, medications, symptoms arrays).
-    Output: same structure with icd11_code, icd11_uri, rxnorm_id, drug_class_epc added.
-    """
-    try:
-        log.info("Enriching: conditions=%d medications=%d symptoms=%d",
+    def enrich(self, payload: dict) -> dict:
+        log.info("=" * 55)
+        log.info("Enrichment: conditions=%d  medications=%d  symptoms=%d",
                  len(payload.get("conditions", [])),
                  len(payload.get("medications", [])),
                  len(payload.get("symptoms", [])))
-        result = dict(payload)
-        result["conditions"]  = [enrich_condition(c) for c in payload.get("conditions", [])]
-        result["medications"] = [enrich_medication(m) for m in payload.get("medications", [])]
-        result["symptoms"]    = [enrich_symptom(s)    for s in payload.get("symptoms", [])]
-        result["_meta"] = {"icd11_release": ICD11_RELEASE, "enriched_at": time.time()}
-        return result
-    except Exception as e:
-        log.error("Enrichment failed: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
+        enriched = dict(payload)
+        enriched["conditions"]  = [self._enrich_condition(c) for c in payload.get("conditions", [])]
+        enriched["medications"] = [self._enrich_medication(m) for m in payload.get("medications", [])]
+        enriched["symptoms"]    = [self._enrich_symptom(s)    for s in payload.get("symptoms", [])]
+        enriched["_enrichment_meta"] = {
+            "icd11_release":   ICD11_RELEASE,
+            "icd11_available": self.icd11._available(),
+        }
+        log.info("Enrichment complete")
+        log.info("=" * 55)
+        return enriched
+
+# ── FastAPI ───────────────────────────────────────────────────────────────────
+app = FastAPI(
+    title="Medical Enrichment Service",
+    description=(
+        "Enriches Health Profile JSON with ICD-11 and RxNorm codes.\n\n"
+        "**Input**: parsed JSON from Cortex (conditions, medications, symptoms).\n\n"
+        "**Output**: same JSON with `icd11_code`, `icd11_uri`, `icd11_definition`, "
+        "`rxnorm_id`, `drug_class_epc`, `brand_names` and more added."
+    ),
+    version="2.0.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Single shared instance — caches RxNorm and ICD-11 lookups in memory
+service = MedicalEnrichmentService()
+
+@app.get("/")
+def root():
+    return {
+        "service": "Medical Enrichment Service",
+        "version": "2.0.0",
+        "docs": "/docs",
+        "icd11_available": service.icd11._available(),
+        "usage": "POST /enrich  with Health Profile JSON body",
+    }
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+@app.post("/enrich")
+def enrich(payload: dict):
+    """
+    Enriches Health Profile JSON.
+
+    Send the raw JSON object from Cortex as the request body.
+    Returns the same structure with medical codes added to each entity.
+    """
+    try:
+        return service.enrich(payload)
+    except Exception as e:
+        log.error("Enrichment failed: %s", e)
+        raise HTTPException(status_code=500, detail=str(e))
