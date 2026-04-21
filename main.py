@@ -316,6 +316,25 @@ class ICD11Client:
             if bad in title:
                 score -= 50
 
+        # Penalise over-specificity: user typed a short general term (e.g.
+        # "Depressive Disorder") but result is a very specific subtype
+        # ("Single episode depressive disorder, severe, without psychotic symptoms").
+        # If query ≤3 words and title has ≥5 words with severity/episode qualifiers
+        # the user never mentioned — penalise once.
+        query_words = q.split()
+        title_words = title.split()
+        specificity_qualifiers = (
+            "single episode", "recurrent", "mild", "moderate", "severe",
+            "without psychotic", "with psychotic", "in partial", "in full",
+            "current episode", "first episode", "unspecified severity",
+            "early onset", "late onset",
+        )
+        if len(query_words) <= 3 and len(title_words) >= 5:
+            for qual in specificity_qualifiers:
+                if qual in title:
+                    score -= 40
+                    break  # one penalty max
+
         return score
 
     def _search_best(self, query: str, flexisearch: bool, headers: dict) -> Optional[dict]:
