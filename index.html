@@ -569,8 +569,17 @@ async function enrich() {
   if (!url) { setStatus('⚠ set service URL first', 'error'); return; }
   if (!raw)  { setStatus('⚠ paste JSON input first', 'error'); return; }
 
+  // Strip ```json ... ``` markdown fences if Cortex wrapped the output
+  let cleaned = raw;
+  if (cleaned.startsWith('```')) {
+    const firstNewline = cleaned.indexOf('\n');
+    if (firstNewline !== -1) cleaned = cleaned.slice(firstNewline + 1);
+    if (cleaned.trimEnd().endsWith('```')) cleaned = cleaned.trimEnd().slice(0, -3);
+    cleaned = cleaned.trim();
+  }
+
   let payload;
-  try { payload = JSON.parse(raw); }
+  try { payload = JSON.parse(cleaned); }
   catch(e) { setStatus('⚠ invalid JSON: ' + e.message, 'error'); return; }
 
   const btn = document.getElementById('enrich-btn');
