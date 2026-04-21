@@ -273,18 +273,17 @@ class ICD11Client:
 
     def _score_entity(self, entity: dict, query: str) -> int:
         """
-        Score an ICD-11 search result by how well its title matches the query.
-        Higher = better. Used to pick the most relevant result when API returns
-        multiple candidates (e.g. 'Anxiety Disorder' → prefer 6B00 over 6E63).
+        Score an ICD-11 result by title match quality. Higher = better.
 
-        Scoring rules:
-          +100  exact case-insensitive title match
+          +100  exact title match
           +60   title starts with query
           +40   title contains all query words
+          +10   bonus: query appears as a phrase inside the title
           +20   title contains any query word
-          -30   title contains 'secondary' / 'other specified' / 'unspecified'
-                (these are catch-all codes, almost never what the user meant)
-          -20   title contains 'NOS' / 'not elsewhere classified'
+          -30   catch-all qualifiers: secondary, unspecified, other specified, NOS
+          -50   etiological qualifiers: induced by, due to, caused by, substance,
+                associated with — these are secondary/substance conditions,
+                almost never what a user typing plain symptoms means
         """
         title = (entity.get("title") or "").lower().strip()
         q     = query.lower().strip()
@@ -295,16 +294,27 @@ class ICD11Client:
         elif title.startswith(q):
             score += 60
         else:
-            words = q.split()
-            if all(w in title for w in words):
-                score += 40
-            elif any(w in title for w in words):
-                score += 20
+            words = [w for w in q.split() if len(w) > 2]
+            if words:
+                if all(w in title for w in words):
+                    score += 40
+                    if q in title:       # phrase bonus
+                        score += 10
+                elif any(w in title for w in words):
+                    score += 20
 
-        # Penalise vague / secondary / catch-all codes
-        for bad in ("secondary", "other specified", "unspecified", " nos ", "not elsewhere"):
+        # Penalise catch-all / unspecified
+        for bad in ("secondary", "other specified", "unspecified", " nos ",
+                    "not elsewhere classified"):
             if bad in title:
                 score -= 30
+
+        # Strongly penalise substance-induced / etiological secondary conditions
+        for bad in ("induced by", "due to", "caused by", "associated with",
+                    "related to", "in the context of", "substance",
+                    "multiple specified", "single specified", "psychoactive"):
+            if bad in title:
+                score -= 50
 
         return score
 
