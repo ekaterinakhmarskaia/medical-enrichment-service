@@ -305,6 +305,49 @@
     gap: 20px;
   }
 
+  /* ── clarification cards ── */
+  .clar-card {
+    background: rgba(245,166,35,.06);
+    border: 1px solid rgba(245,166,35,.2);
+    border-radius: 10px;
+    padding: 14px 16px;
+    animation: fadeUp .3s ease both;
+  }
+  .clar-type {
+    font-family: 'DM Mono', monospace;
+    font-size: 10px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--yellow);
+    margin-bottom: 6px;
+    opacity: .7;
+  }
+  .clar-raw {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+  .clar-reason {
+    font-size: 12px;
+    color: #9ba3b5;
+    margin-bottom: 10px;
+  }
+  .clar-suggestions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .clar-chip {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    background: rgba(245,166,35,.1);
+    border: 1px solid rgba(245,166,35,.25);
+    color: #e8c97a;
+    cursor: default;
+  }
+
   /* ── spinner ── */
   .spinner {
     width: 14px; height: 14px;
@@ -402,6 +445,19 @@
   <span class="status" id="status"></span>
 </div>
 
+<!-- Clarification needed -->
+<div id="clarification-panel" style="max-width:900px;margin:0 auto 20px;display:none;">
+  <div class="panel" style="border-color:#f5a62355;">
+    <div class="panel-header" style="border-color:#f5a62322;">
+      <span class="panel-label" style="color:var(--yellow);">⚠ Нужно уточнить у пользователя</span>
+      <span id="clar-count" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--yellow);"></span>
+    </div>
+    <div class="panel-body">
+      <div id="clarification-cards" class="cards"></div>
+    </div>
+  </div>
+</div>
+
 <!-- Results -->
 <div class="panel" id="output-panel">
   <div class="panel-header">
@@ -485,6 +541,8 @@ function clearAll() {
   document.getElementById('raw-btn').style.display = 'none';
   document.getElementById('output-panel').classList.remove('visible');
   document.getElementById('results-grid').innerHTML = '';
+  document.getElementById('clarification-cards').innerHTML = '';
+  document.getElementById('clarification-panel').style.display = 'none';
   document.getElementById('status').textContent = '';
   document.getElementById('status').className = 'status';
   document.getElementById('meta-info').textContent = '';
@@ -545,6 +603,7 @@ async function enrich() {
       (meta.icd11_release ? 'ICD-11 ' + meta.icd11_release : '') +
       (meta.icd11_available ? ' · API ✓' : ' · API ✗');
 
+    renderClarification(data);
     renderResults(data);
     setStatus('✓ enriched in ' + elapsed + 's', 'ok');
 
@@ -590,6 +649,40 @@ function renderResults(data) {
   });
 
   document.getElementById('output-panel').classList.add('visible');
+}
+
+function renderClarification(data) {
+  const items = data.clarification_needed || [];
+  const panel = document.getElementById('clarification-panel');
+  const cards = document.getElementById('clarification-cards');
+  const count = document.getElementById('clar-count');
+
+  cards.innerHTML = '';
+
+  if (!items.length) {
+    panel.style.display = 'none';
+    return;
+  }
+
+  panel.style.display = 'block';
+  count.textContent = items.length + ' вопрос' + (items.length > 1 ? 'а' : '');
+
+  items.forEach((item, i) => {
+    const card = document.createElement('div');
+    card.className = 'clar-card';
+    card.style.animationDelay = (i * 60) + 'ms';
+
+    const typeLabel = { condition: 'Диагноз', medication: 'Препарат', symptom: 'Симптом' }[item.type] || item.type;
+    const suggestions = (item.suggested_conditions || []);
+
+    card.innerHTML = `
+      <div class="clar-type">${esc(typeLabel)}</div>
+      <div class="clar-raw">${esc(item.raw_text)}</div>
+      <div class="clar-reason">${esc(item.reason)}</div>
+      ${suggestions.length ? `<div class="clar-suggestions">${suggestions.map(s => `<span class="clar-chip">${esc(s)}</span>`).join('')}</div>` : ''}
+    `;
+    cards.appendChild(card);
+  });
 }
 
 function renderCondition(c) {
