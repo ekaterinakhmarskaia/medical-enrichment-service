@@ -3,799 +3,347 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Medical Enrichment — Welltory</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<title>Health Profile · Welltory</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #000; --surface: #1c1c1e; --surface2: #2c2c2e;
+  --border: #3a3a3c; --text: #fff; --muted: #8e8e93;
+  --blue: #0a84ff; --red: #ff3b30; --green: #30d158;
+}
+body {
+  font-family: 'Inter', -apple-system, sans-serif;
+  background: #111; color: var(--text);
+  min-height: 100vh; display: flex; justify-content: center;
+  padding: 0 0 80px;
+}
+.phone { width: 390px; min-height: 100vh; display: flex; flex-direction: column; }
 
-  :root {
-    --bg:        #0d0f14;
-    --surface:   #13161d;
-    --border:    #1e2330;
-    --border2:   #2a3040;
-    --text:      #e8eaf0;
-    --muted:     #6b7285;
-    --accent:    #4f8ef7;
-    --accent2:   #7c5cfc;
-    --green:     #3ecf8e;
-    --yellow:    #f5a623;
-    --red:       #f55e5e;
-    --pill-bg:   #1a1f2e;
-  }
+/* topbar */
+.topbar { background: #0a0a0a; border-bottom: 1px solid var(--border); padding: 16px; }
+.topbar-label { font-size: 11px; color: var(--muted); letter-spacing:.04em; text-transform:uppercase; margin-bottom:10px; }
+.url-field { display:flex; align-items:center; background:var(--surface2); border-radius:10px; padding:9px 12px; margin-bottom:10px; gap:8px; }
+.url-field span { font-size:10px; color:var(--muted); white-space:nowrap; }
+.url-field input { flex:1; background:transparent; border:none; outline:none; font-size:12px; color:var(--blue); font-family:inherit; }
+textarea#input-json { width:100%; height:90px; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:10px 12px; font-size:12px; font-family:inherit; color:var(--text); resize:vertical; outline:none; margin-bottom:10px; }
+textarea#input-json::placeholder { color:var(--muted); }
+.btn-row { display:flex; gap:8px; align-items:center; }
+.btn-enrich { flex:1; background:var(--blue); color:#fff; border:none; border-radius:10px; padding:11px; font-size:14px; font-weight:600; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px; transition:opacity .15s; }
+.btn-enrich:disabled { opacity:.4; cursor:not-allowed; }
+.btn-example { background:var(--surface2); color:var(--muted); border:none; border-radius:10px; padding:11px 14px; font-size:13px; cursor:pointer; }
+.btn-example:hover { color:var(--text); }
+.status-line { font-size:11px; color:var(--muted); margin-top:6px; min-height:16px; }
+.status-line.ok { color:var(--green); } .status-line.err { color:var(--red); } .status-line.loading { color:var(--blue); }
 
-  body {
-    font-family: 'DM Sans', sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    min-height: 100vh;
-    padding: 48px 24px 80px;
-  }
+/* app */
+.app-content { flex:1; padding:0 0 20px; background:var(--bg); }
+.hp-header { padding:24px 20px 16px; }
+.hp-header h1 { font-size:28px; font-weight:700; margin-bottom:6px; }
+.hp-header .subtitle { font-size:14px; color:var(--muted); line-height:1.4; margin-bottom:4px; }
+.hp-header .ai-link { font-size:14px; color:var(--blue); text-decoration:none; }
 
-  /* ── header ── */
-  header {
-    max-width: 900px;
-    margin: 0 auto 48px;
-    display: flex;
-    align-items: baseline;
-    gap: 16px;
-  }
-  header h1 {
-    font-size: 15px;
-    font-weight: 500;
-    letter-spacing: .06em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-  header .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-bottom: 2px; }
-  header .tag {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    color: var(--accent);
-    background: rgba(79,142,247,.1);
-    border: 1px solid rgba(79,142,247,.2);
-    padding: 2px 8px;
-    border-radius: 4px;
-  }
+.section-header { padding:20px 20px 10px; }
+.section-header h2 { font-size:20px; font-weight:700; }
+.section-header .section-sub { font-size:13px; color:var(--muted); margin-top:2px; line-height:1.4; }
+.section-header .section-sub a { color:var(--blue); text-decoration:none; }
 
-  /* ── layout ── */
-  .layout {
-    max-width: 900px;
-    margin: 0 auto;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 20px;
-  }
-  @media (max-width: 680px) { .layout { grid-template-columns: 1fr; } }
+/* item list */
+.item-list { padding:0 16px; display:flex; flex-direction:column; gap:2px; }
+.item-card { background:var(--surface); border-radius:4px; padding:14px 16px; display:flex; align-items:center; gap:12px; animation:fadeUp .25s ease both; }
+.item-card:first-child { border-radius:14px 14px 4px 4px; }
+.item-card:last-child { border-radius:4px 4px 14px 14px; }
+.item-card:only-child { border-radius:14px; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+.item-dot { width:10px; height:10px; border-radius:50%; background:var(--red); flex-shrink:0; }
+.item-dot.hidden { visibility:hidden; }
+.item-info { flex:1; }
+.item-name { font-size:16px; font-weight:500; margin-bottom:2px; }
+.item-meta { font-size:13px; color:var(--muted); }
+.item-action { color:#636366; padding:4px; flex-shrink:0; }
 
-  /* ── panels ── */
-  .panel {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    overflow: hidden;
-  }
-  .panel-header {
-    padding: 14px 18px;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .panel-label {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    color: var(--muted);
-  }
-  .panel-body { padding: 18px; }
+/* clarification */
+.clar-block { margin:16px 16px 4px; background:var(--surface); border-radius:14px; padding:16px; display:none; animation:fadeUp .3s ease; }
+.clar-block.visible { display:block; }
+.clar-q { font-size:15px; font-weight:600; margin-bottom:3px; }
+.clar-hint { font-size:13px; color:var(--muted); margin-bottom:14px; }
+.clar-chips { display:flex; flex-wrap:wrap; gap:8px; }
+.clar-chip { background:var(--surface2); border:1px solid var(--border); border-radius:20px; padding:7px 14px; font-size:14px; color:var(--text); cursor:pointer; transition:background .15s; }
+.clar-chip:hover { background:#3a3a3c; }
+.clar-chip.none { color:var(--muted); }
 
-  /* ── textarea ── */
-  textarea {
-    width: 100%;
-    height: 320px;
-    background: transparent;
-    border: none;
-    outline: none;
-    resize: none;
-    font-family: 'DM Mono', monospace;
-    font-size: 12px;
-    line-height: 1.7;
-    color: var(--text);
-    caret-color: var(--accent);
-  }
-  textarea::placeholder { color: var(--muted); opacity: .5; }
+/* log */
+.log-block { margin:20px 16px 0; display:none; }
+.log-block.visible { display:block; }
+.log-title { font-size:11px; color:var(--muted); margin-bottom:10px; text-transform:uppercase; letter-spacing:.04em; }
+.log-bubble { background:var(--surface); border-radius:14px 14px 14px 4px; padding:12px 14px; font-size:13px; line-height:1.5; color:#d1d1d6; white-space:pre-wrap; word-break:break-word; font-family:inherit; }
 
-  /* ── button ── */
-  .btn-row {
-    max-width: 900px;
-    margin: 16px auto;
-    display: flex;
-    gap: 10px;
-    align-items: center;
-  }
-  button {
-    padding: 11px 24px;
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: opacity .15s, transform .1s;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  button:hover { opacity: .88; transform: translateY(-1px); }
-  button:active { transform: translateY(0); }
-  button:disabled { opacity: .4; cursor: not-allowed; transform: none; }
-  .btn-clear {
-    background: transparent;
-    border: 1px solid var(--border2);
-    color: var(--muted);
-    font-weight: 400;
-  }
-  .btn-clear:hover { color: var(--text); border-color: var(--muted); opacity: 1; }
+/* modal */
+.modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:100; justify-content:center; align-items:flex-end; }
+.modal-overlay.visible { display:flex; }
+.modal-sheet { background:#1c1c1e; border-radius:20px 20px 0 0; width:390px; max-height:85vh; overflow-y:auto; padding:20px 0 40px; animation:slideUp .25s ease; position:relative; }
+@keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+.modal-handle { width:36px; height:4px; background:var(--border); border-radius:2px; margin:0 auto 16px; }
+.modal-title { font-size:20px; font-weight:700; padding:0 20px 16px; }
+.modal-section-label { font-size:13px; color:var(--muted); padding:12px 20px 8px; font-weight:500; }
+.modal-close { position:absolute; top:8px; right:16px; background:var(--surface2); border:none; color:var(--muted); border-radius:50%; width:30px; height:30px; font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center; }
 
-  .status {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    color: var(--muted);
-    margin-left: auto;
-  }
-  .status.loading { color: var(--accent); }
-  .status.error   { color: var(--red); }
-  .status.ok      { color: var(--green); }
+.spinner { width:14px; height:14px; border:2px solid rgba(255,255,255,.25); border-top-color:#fff; border-radius:50%; animation:spin .6s linear infinite; display:inline-block; }
+@keyframes spin { to{transform:rotate(360deg)} }
 
-  /* ── URL config ── */
-  .url-row {
-    max-width: 900px;
-    margin: 0 auto 20px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 14px;
-  }
-  .url-row label {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    color: var(--muted);
-    white-space: nowrap;
-  }
-  .url-row input {
-    flex: 1;
-    background: transparent;
-    border: none;
-    outline: none;
-    font-family: 'DM Mono', monospace;
-    font-size: 12px;
-    color: var(--accent);
-  }
-
-  /* ── result output ── */
-  #output-panel { grid-column: 1 / -1; display: none; }
-  #output-panel.visible { display: block; }
-
-  /* ── cards ── */
-  .section-title {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    letter-spacing: .1em;
-    text-transform: uppercase;
-    color: var(--muted);
-    margin-bottom: 12px;
-  }
-  .cards { display: flex; flex-direction: column; gap: 10px; }
-
-  .card {
-    background: var(--pill-bg);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 14px 16px;
-    animation: fadeUp .3s ease both;
-  }
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  .card-name {
-    font-weight: 600;
-    font-size: 14px;
-    margin-bottom: 6px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-  .card-user {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    color: var(--muted);
-    font-style: italic;
-  }
-
-  .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-  .badge {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    padding: 3px 8px;
-    border-radius: 4px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-  .badge-code  { background: rgba(79,142,247,.12); color: var(--accent); border: 1px solid rgba(79,142,247,.2); }
-  .badge-class { background: rgba(124,92,252,.12); color: var(--accent2); border: 1px solid rgba(124,92,252,.2); }
-  .badge-hrv   { background: rgba(245,166,35,.12);  color: var(--yellow); border: 1px solid rgba(245,166,35,.25); }
-  .badge-ok    { background: rgba(62,207,142,.1);   color: var(--green);  border: 1px solid rgba(62,207,142,.2); }
-  .badge-unres { background: rgba(245,94,94,.1);    color: var(--red);    border: 1px solid rgba(245,94,94,.2); }
-  .badge-atc   { background: rgba(107,114,133,.12); color: var(--muted);  border: 1px solid var(--border2); }
-
-  .card-def {
-    font-size: 12px;
-    line-height: 1.6;
-    color: #9ba3b5;
-    border-top: 1px solid var(--border);
-    padding-top: 10px;
-    margin-top: 6px;
-  }
-
-  .brands {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    color: var(--muted);
-    margin-top: 6px;
-  }
-  .brands span { color: #8b95aa; }
-
-  .icd-link {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    color: var(--accent);
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    margin-top: 8px;
-    opacity: .7;
-    transition: opacity .15s;
-  }
-  .icd-link:hover { opacity: 1; }
-
-  /* ── index terms ── */
-  .index-terms {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    margin-top: 8px;
-  }
-  .index-term {
-    font-family: 'DM Mono', monospace;
-    font-size: 10px;
-    padding: 2px 6px;
-    border-radius: 3px;
-    background: rgba(255,255,255,.04);
-    color: var(--muted);
-    border: 1px solid var(--border);
-  }
-
-  /* ── meta ── */
-  .meta-row {
-    max-width: 900px;
-    margin: 16px auto 0;
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    color: var(--muted);
-    display: flex;
-    gap: 16px;
-  }
-  .meta-row span { color: var(--green); }
-
-  /* ── sections layout ── */
-  .results-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-    gap: 20px;
-  }
-
-  /* ── clarification cards ── */
-  .clar-card {
-    background: rgba(245,166,35,.06);
-    border: 1px solid rgba(245,166,35,.2);
-    border-radius: 10px;
-    padding: 14px 16px;
-    animation: fadeUp .3s ease both;
-  }
-  .clar-type {
-    font-family: 'DM Mono', monospace;
-    font-size: 10px;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    color: var(--yellow);
-    margin-bottom: 6px;
-    opacity: .7;
-  }
-  .clar-raw {
-    font-weight: 600;
-    font-size: 14px;
-    margin-bottom: 6px;
-  }
-  .clar-reason {
-    font-size: 12px;
-    color: #9ba3b5;
-    margin-bottom: 10px;
-  }
-  .clar-suggestions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-  .clar-chip {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    padding: 4px 10px;
-    border-radius: 20px;
-    background: rgba(245,166,35,.1);
-    border: 1px solid rgba(245,166,35,.25);
-    color: #e8c97a;
-    cursor: default;
-  }
-
-  /* ── spinner ── */
-  .spinner {
-    width: 14px; height: 14px;
-    border: 2px solid rgba(255,255,255,.2);
-    border-top-color: #fff;
-    border-radius: 50%;
-    animation: spin .6s linear infinite;
-    display: inline-block;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ── raw json toggle ── */
-  .raw-toggle {
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    color: var(--muted);
-    background: transparent;
-    border: 1px solid var(--border2);
-    padding: 4px 10px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-weight: 400;
-    transition: color .15s, border-color .15s;
-  }
-  .raw-toggle:hover { color: var(--text); border-color: var(--muted); opacity: 1; }
-
-  pre#raw-json {
-    display: none;
-    font-family: 'DM Mono', monospace;
-    font-size: 11px;
-    line-height: 1.7;
-    color: #8b95aa;
-    white-space: pre-wrap;
-    word-break: break-all;
-    margin-top: 16px;
-    padding: 16px;
-    background: rgba(0,0,0,.3);
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    max-height: 400px;
-    overflow-y: auto;
-  }
+.empty-note { padding:16px 20px; font-size:13px; color:var(--muted); }
 </style>
 </head>
 <body>
+<div class="phone">
 
-<header>
-  <div class="dot"></div>
-  <h1>Medical Enrichment</h1>
-  <div class="tag">Welltory · Health Profile</div>
-</header>
-
-<!-- URL config -->
-<div class="url-row">
-  <label>SERVICE URL</label>
-  <input type="text" id="service-url" placeholder="https://your-app.up.railway.app" />
-</div>
-
-<!-- Input / raw output panels -->
-<div class="layout">
-  <div class="panel">
-    <div class="panel-header">
-      <span class="panel-label">Input JSON</span>
-      <button class="btn-clear" onclick="loadExample()" style="padding:4px 10px;font-size:11px;">load example</button>
+  <!-- INPUT -->
+  <div class="topbar">
+    <div class="topbar-label">⚕ Medical Enrichment · Welltory</div>
+    <div class="url-field">
+      <span>URL</span>
+      <input type="text" id="service-url" />
     </div>
-    <div class="panel-body">
-      <textarea id="input-json" placeholder='{
-  "conditions": [...],
-  "medications": [...],
-  "symptoms": [...]
-}'></textarea>
+    <textarea id="input-json" placeholder="Paste JSON from Cortex (```json fences ok)…"></textarea>
+    <div class="btn-row">
+      <button class="btn-example" onclick="loadExample()">Example</button>
+      <button class="btn-enrich" id="enrich-btn" onclick="enrich()">
+        <span id="btn-text">Enrich & Show</span>
+      </button>
     </div>
+    <div class="status-line" id="status"></div>
   </div>
 
-  <div class="panel">
-    <div class="panel-header">
-      <span class="panel-label">Raw Response</span>
-      <button class="raw-toggle" id="raw-btn" onclick="toggleRaw()" style="display:none">show raw</button>
+  <!-- APP -->
+  <div class="app-content" id="app-content" style="display:none;">
+    <div class="hp-header">
+      <h1>Health profile</h1>
+      <p class="subtitle">Built from what you've shared to better interpret your data. Update it anytime.</p>
+      <a class="ai-link" href="#" onclick="return false;">That's how our AI sees you</a>
     </div>
-    <div class="panel-body" style="max-height:360px;overflow-y:auto;">
-      <pre id="raw-json"></pre>
-      <div id="raw-placeholder" style="color:var(--muted);font-family:'DM Mono',monospace;font-size:12px;padding:8px 0;">
-        Response will appear here after enrichment.
+
+    <!-- clarification -->
+    <div class="clar-block" id="clar-block">
+      <div class="clar-q">Does any of this sound like you?</div>
+      <div class="clar-hint">People taking similar medications also mention:</div>
+      <div class="clar-chips" id="clar-chips"></div>
+    </div>
+
+    <!-- conditions -->
+    <div id="conditions-section" style="display:none;">
+      <div class="section-header"><h2>Conditions</h2></div>
+      <div class="item-list" id="conditions-list"></div>
+    </div>
+
+    <!-- symptoms -->
+    <div id="symptoms-section" style="display:none;">
+      <div class="section-header"><h2>Symptoms</h2></div>
+      <div class="item-list" id="symptoms-list"></div>
+    </div>
+
+    <!-- medications -->
+    <div id="medications-section" style="display:none;">
+      <div class="section-header">
+        <h2>Medications</h2>
+        <p class="section-sub">These medications may affect your heart rate and your insights. <a href="#" onclick="openAllMeds();return false;">See all medications you added</a></p>
       </div>
+      <div class="item-list" id="medications-list"></div>
+    </div>
+
+    <!-- log -->
+    <div class="log-block" id="log-block">
+      <div class="log-title">What you shared</div>
+      <div class="log-bubble" id="log-bubble"></div>
     </div>
   </div>
 </div>
 
-<!-- Action row -->
-<div class="btn-row">
-  <button id="enrich-btn" onclick="enrich()">
-    <span id="btn-text">Enrich</span>
-  </button>
-  <button class="btn-clear" onclick="clearAll()">Clear</button>
-  <span class="status" id="status"></span>
-</div>
-
-<!-- Clarification needed -->
-<div id="clarification-panel" style="max-width:900px;margin:0 auto 20px;display:none;">
-  <div class="panel" style="border-color:#f5a62355;">
-    <div class="panel-header" style="border-color:#f5a62322;">
-      <span class="panel-label" style="color:var(--yellow);">⚠ Нужно уточнить у пользователя</span>
-      <span id="clar-count" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--yellow);"></span>
+<!-- ALL MEDS MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeAllMeds()">✕</button>
+    <div class="modal-title">All medications</div>
+    <div id="modal-hrv-section">
+      <div class="modal-section-label">Medications that may affect your heart rate and insights</div>
+      <div class="item-list" id="modal-hrv-list"></div>
     </div>
-    <div class="panel-body">
-      <div id="clarification-cards" class="cards"></div>
+    <div id="modal-other-section">
+      <div class="modal-section-label">Other medications you added</div>
+      <div class="item-list" id="modal-other-list"></div>
     </div>
-  </div>
-</div>
-
-<!-- Results -->
-<div class="panel" id="output-panel">
-  <div class="panel-header">
-    <span class="panel-label">Enriched Result</span>
-    <span id="meta-info" style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);"></span>
-  </div>
-  <div class="panel-body">
-    <div class="results-grid" id="results-grid"></div>
   </div>
 </div>
 
 <script>
-const EXAMPLE = {
-  "conditions": [
-    {
-      "name_user": "POTS",
-      "name_display": "Postural Orthostatic Tachycardia Syndrome",
-      "icd11_code": null,
-      "icd11_uri": null,
-      "status": "active",
-      "is_unresolved": false
-    },
-    {
-      "name_user": "anxiety",
-      "name_display": "Anxiety Disorder",
-      "icd11_code": null,
-      "icd11_uri": null,
-      "status": "active",
-      "is_unresolved": false
-    }
-  ],
-  "medications": [
-    {
-      "name_user": "metoprolol 25mg",
-      "name_generic": "metoprolol",
-      "rxnorm_id": null,
-      "drug_class_epc": null,
-      "dose": "25mg",
-      "frequency": "daily",
-      "affects_hrv_hr": null,
-      "is_unresolved": false
-    },
-    {
-      "name_user": "sertraline 50mg",
-      "name_generic": "sertraline",
-      "rxnorm_id": null,
-      "drug_class_epc": null,
-      "dose": "50mg",
-      "frequency": "daily",
-      "affects_hrv_hr": null,
-      "is_unresolved": false
-    }
-  ],
-  "symptoms": [
-    {
-      "name_user": "constantly exhausted",
-      "name_display": "Fatigue",
-      "cluster": "fatigue",
-      "duration_hint": "chronic",
-      "is_unresolved": false
-    },
-    {
-      "name_user": "brain fog",
-      "name_display": "Cognitive Impairment",
-      "cluster": "cognitive",
-      "duration_hint": "chronic",
-      "is_unresolved": false
-    }
-  ]
-};
+const EXAMPLE = {"conditions":[{"name_user":"POTS","name_display":"Postural Orthostatic Tachycardia Syndrome","icd11_code":null,"icd11_uri":null,"status":"active","is_unresolved":false},{"name_user":"anxiety","name_display":"Anxiety Disorder","icd11_code":null,"icd11_uri":null,"status":"active","is_unresolved":false}],"medications":[{"name_user":"metoprolol 25mg","name_generic":"metoprolol","rxnorm_id":null,"drug_class_epc":"Beta-Adrenergic Blocker","dose":"25mg","frequency":"daily","affects_hrv_hr":true,"is_unresolved":false},{"name_user":"sertraline 50mg","name_generic":"sertraline","rxnorm_id":null,"drug_class_epc":"Selective Serotonin Reuptake Inhibitor","dose":"50mg","frequency":"daily","affects_hrv_hr":true,"is_unresolved":false},{"name_user":"vitamin D 2000IU","name_generic":"cholecalciferol","rxnorm_id":null,"drug_class_epc":null,"dose":"2000 IU","frequency":"daily","affects_hrv_hr":false,"is_unresolved":false},{"name_user":"magnesium 400mg","name_generic":"magnesium","rxnorm_id":null,"drug_class_epc":null,"dose":"400mg","frequency":"daily","affects_hrv_hr":false,"is_unresolved":false}],"symptoms":[{"name_user":"constantly exhausted","name_display":"Fatigue","cluster":"fatigue","duration_hint":"chronic","is_unresolved":false},{"name_user":"brain fog","name_display":"Cognitive Impairment","cluster":"cognitive","duration_hint":"chronic","is_unresolved":false}],"user_confirmed_none":{"conditions":false,"medications":false,"symptoms":false},"clarification_needed":[{"type":"condition","raw_text":"metoprolol","reason":"Multiple indications","suggested_conditions":["Hypertension","Arrhythmia","Heart Failure","Tachycardia"]},{"type":"condition","raw_text":"sertraline","reason":"SSRI","suggested_conditions":["Depression","OCD","Anxiety Disorder"]}]};
 
-function loadExample() {
-  document.getElementById('input-json').value = JSON.stringify(EXAMPLE, null, 2);
-}
+function loadExample() { document.getElementById('input-json').value = JSON.stringify(EXAMPLE, null, 2); }
 
-function clearAll() {
-  document.getElementById('input-json').value = '';
-  document.getElementById('raw-json').textContent = '';
-  document.getElementById('raw-json').style.display = 'none';
-  document.getElementById('raw-placeholder').style.display = 'block';
-  document.getElementById('raw-btn').style.display = 'none';
-  document.getElementById('output-panel').classList.remove('visible');
-  document.getElementById('results-grid').innerHTML = '';
-  document.getElementById('clarification-cards').innerHTML = '';
-  document.getElementById('clarification-panel').style.display = 'none';
-  document.getElementById('status').textContent = '';
-  document.getElementById('status').className = 'status';
-  document.getElementById('meta-info').textContent = '';
-}
-
-function toggleRaw() {
-  const pre = document.getElementById('raw-json');
-  const btn = document.getElementById('raw-btn');
-  const visible = pre.style.display === 'block';
-  pre.style.display = visible ? 'none' : 'block';
-  btn.textContent = visible ? 'show raw' : 'hide raw';
+function stripFences(raw) {
+  let s = raw.trim();
+  if (s.startsWith('```')) {
+    const nl = s.indexOf('\n');
+    if (nl !== -1) s = s.slice(nl + 1);
+    if (s.trimEnd().endsWith('```')) s = s.trimEnd().slice(0, -3);
+  }
+  return s.trim();
 }
 
 function setStatus(msg, type='') {
   const el = document.getElementById('status');
-  el.textContent = msg;
-  el.className = 'status ' + type;
+  el.textContent = msg; el.className = 'status-line ' + type;
 }
+
+let _rawInput = '';
 
 async function enrich() {
   const url = document.getElementById('service-url').value.trim().replace(/\/$/, '');
   const raw  = document.getElementById('input-json').value.trim();
-
-  if (!url) { setStatus('⚠ set service URL first', 'error'); return; }
-  if (!raw)  { setStatus('⚠ paste JSON input first', 'error'); return; }
-
-  // Strip ```json ... ``` markdown fences if Cortex wrapped the output
-  let cleaned = raw;
-  if (cleaned.startsWith('```')) {
-    const firstNewline = cleaned.indexOf('\n');
-    if (firstNewline !== -1) cleaned = cleaned.slice(firstNewline + 1);
-    if (cleaned.trimEnd().endsWith('```')) cleaned = cleaned.trimEnd().slice(0, -3);
-    cleaned = cleaned.trim();
-  }
+  if (!url) { setStatus('⚠ Set service URL first', 'err'); return; }
+  if (!raw)  { setStatus('⚠ Paste JSON first', 'err'); return; }
 
   let payload;
-  try { payload = JSON.parse(cleaned); }
-  catch(e) { setStatus('⚠ invalid JSON: ' + e.message, 'error'); return; }
+  try { payload = JSON.parse(stripFences(raw)); }
+  catch(e) { setStatus('⚠ Invalid JSON: ' + e.message, 'err'); return; }
+  _rawInput = raw;
 
   const btn = document.getElementById('enrich-btn');
   const btnText = document.getElementById('btn-text');
   btn.disabled = true;
   btnText.innerHTML = '<span class="spinner"></span> Enriching…';
-  setStatus('calling ' + url + '/enrich …', 'loading');
+  setStatus('Calling enrichment service…', 'loading');
 
   const t0 = Date.now();
   try {
     const res = await fetch(url + '/enrich', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
     });
-    if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + res.statusText);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
-
-    // Raw pane
-    document.getElementById('raw-json').textContent = JSON.stringify(data, null, 2);
-    document.getElementById('raw-json').style.display = 'none';
-    document.getElementById('raw-placeholder').style.display = 'none';
-    document.getElementById('raw-btn').style.display = 'inline-flex';
-    document.getElementById('raw-btn').textContent = 'show raw';
-
-    // Meta
-    const meta = data._enrichment_meta || {};
-    document.getElementById('meta-info').textContent =
-      (meta.icd11_release ? 'ICD-11 ' + meta.icd11_release : '') +
-      (meta.icd11_available ? ' · API ✓' : ' · API ✗');
-
-    renderClarification(data);
-    renderResults(data);
-    setStatus('✓ enriched in ' + elapsed + 's', 'ok');
-
+    setStatus('✓ Done in ' + ((Date.now()-t0)/1000).toFixed(1) + 's', 'ok');
+    render(data);
   } catch(e) {
-    setStatus('✗ ' + e.message, 'error');
+    setStatus('✗ ' + e.message, 'err');
   } finally {
-    btn.disabled = false;
-    btnText.textContent = 'Enrich';
+    btn.disabled = false; btnText.textContent = 'Enrich & Show';
   }
 }
 
-function badge(text, cls, title='') {
-  return `<span class="badge badge-${cls}" title="${title}">${text}</span>`;
+function render(data) {
+  document.getElementById('app-content').style.display = 'block';
+
+  const conditions  = data.conditions  || [];
+  const medications = data.medications || [];
+  const symptoms    = data.symptoms    || [];
+  const clars       = data.clarification_needed || [];
+
+  // — Clarification: merge all suggested_conditions into one deduplicated list —
+  const allSugg = [];
+  clars.forEach(c => (c.suggested_conditions || []).forEach(s => { if (!allSugg.includes(s)) allSugg.push(s); }));
+  const clarBlock = document.getElementById('clar-block');
+  const clarChips = document.getElementById('clar-chips');
+  clarChips.innerHTML = '';
+  if (allSugg.length) {
+    clarBlock.classList.add('visible');
+    allSugg.forEach(s => { const ch = document.createElement('span'); ch.className='clar-chip'; ch.textContent=s; clarChips.appendChild(ch); });
+    const n = document.createElement('span'); n.className='clar-chip none'; n.textContent='None of these'; clarChips.appendChild(n);
+  } else { clarBlock.classList.remove('visible'); }
+
+  // — Conditions —
+  const condS = document.getElementById('conditions-section');
+  const condL = document.getElementById('conditions-list');
+  condL.innerHTML = '';
+  if (conditions.length) {
+    condS.style.display = 'block';
+    conditions.forEach((c,i) => condL.appendChild(card(c.name_display||c.name_user, [c.icd11_code?'ICD-11 · '+c.icd11_code:null, c.status].filter(Boolean).join(' · '), false, i*50)));
+  } else condS.style.display = 'none';
+
+  // — Symptoms —
+  const symS = document.getElementById('symptoms-section');
+  const symL = document.getElementById('symptoms-list');
+  symL.innerHTML = '';
+  if (symptoms.length) {
+    symS.style.display = 'block';
+    symptoms.forEach((s,i) => symL.appendChild(card(s.name_display||s.name_user, [s.cluster, s.duration_hint].filter(Boolean).join(' · '), false, i*50)));
+  } else symS.style.display = 'none';
+
+  // — Medications —
+  const medS   = document.getElementById('medications-section');
+  const medL   = document.getElementById('medications-list');
+  const mHrv   = document.getElementById('modal-hrv-list');
+  const mOther = document.getElementById('modal-other-list');
+  medL.innerHTML = ''; mHrv.innerHTML = ''; mOther.innerHTML = '';
+
+  const hrv   = medications.filter(m => m.affects_hrv_hr);
+  const other = medications.filter(m => !m.affects_hrv_hr);
+
+  if (medications.length) {
+    medS.style.display = 'block';
+    // main: only HRV-affecting
+    if (hrv.length) hrv.forEach((m,i) => medL.appendChild(card(cap(m.name_generic||m.name_user), meta(m), true, i*50)));
+    else { const p=document.createElement('div'); p.className='empty-note'; p.textContent='No HRV-affecting medications.'; medL.appendChild(p); }
+    // modal hrv
+    document.getElementById('modal-hrv-section').style.display = hrv.length ? 'block' : 'none';
+    hrv.forEach(m => mHrv.appendChild(card(cap(m.name_generic||m.name_user), meta(m), true)));
+    // modal other
+    document.getElementById('modal-other-section').style.display = other.length ? 'block' : 'none';
+    other.forEach(m => mOther.appendChild(card(cap(m.name_generic||m.name_user), meta(m), false)));
+  } else medS.style.display = 'none';
+
+  // — Log —
+  const logBlock = document.getElementById('log-block');
+  const logBubble = document.getElementById('log-bubble');
+  const stripped = stripFences(_rawInput);
+  logBubble.textContent = stripped.length > 800 ? stripped.slice(0,800)+'…' : stripped;
+  logBlock.classList.add('visible');
 }
 
-function renderResults(data) {
-  const grid = document.getElementById('results-grid');
-  grid.innerHTML = '';
-
-  const sections = [
-    { key: 'conditions', label: 'Conditions', render: renderCondition },
-    { key: 'medications', label: 'Medications', render: renderMedication },
-    { key: 'symptoms',   label: 'Symptoms',   render: renderSymptom },
-  ];
-
-  sections.forEach(({ key, label, render }) => {
-    const items = data[key] || [];
-    if (!items.length) return;
-
-    const col = document.createElement('div');
-    col.innerHTML = `<div class="section-title">${label} <span style="color:var(--accent)">${items.length}</span></div>`;
-    const cards = document.createElement('div');
-    cards.className = 'cards';
-    items.forEach((item, i) => {
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.style.animationDelay = (i * 60) + 'ms';
-      card.innerHTML = render(item);
-      cards.appendChild(card);
-    });
-    col.appendChild(cards);
-    grid.appendChild(col);
-  });
-
-  document.getElementById('output-panel').classList.add('visible');
+function card(name, metaText, dot, delay=0) {
+  const el = document.createElement('div');
+  el.className = 'item-card';
+  el.style.animationDelay = delay + 'ms';
+  el.innerHTML = `
+    <div class="item-dot${dot?'':' hidden'}"></div>
+    <div class="item-info">
+      <div class="item-name">${esc(name)}</div>
+      ${metaText ? `<div class="item-meta">${esc(metaText)}</div>` : ''}
+    </div>
+    <div class="item-action"><svg width="15" height="17" viewBox="0 0 16 18" fill="none"><path d="M1 4h14M5 4V2h6v2M6 8v6M10 8v6M2 4l1 12h10L14 4H2z" stroke="#636366" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+  `;
+  return el;
 }
 
-function renderClarification(data) {
-  const items = data.clarification_needed || [];
-  const panel = document.getElementById('clarification-panel');
-  const cards = document.getElementById('clarification-cards');
-  const count = document.getElementById('clar-count');
-
-  cards.innerHTML = '';
-
-  if (!items.length) {
-    panel.style.display = 'none';
-    return;
-  }
-
-  panel.style.display = 'block';
-  count.textContent = items.length + ' вопрос' + (items.length > 1 ? 'а' : '');
-
-  items.forEach((item, i) => {
-    const card = document.createElement('div');
-    card.className = 'clar-card';
-    card.style.animationDelay = (i * 60) + 'ms';
-
-    const typeLabel = { condition: 'Диагноз', medication: 'Препарат', symptom: 'Симптом' }[item.type] || item.type;
-    const suggestions = (item.suggested_conditions || []);
-
-    card.innerHTML = `
-      <div class="clar-type">${esc(typeLabel)}</div>
-      <div class="clar-raw">${esc(item.raw_text)}</div>
-      <div class="clar-reason">${esc(item.reason)}</div>
-      ${suggestions.length ? `<div class="clar-suggestions">${suggestions.map(s => `<span class="clar-chip">${esc(s)}</span>`).join('')}</div>` : ''}
-    `;
-    cards.appendChild(card);
-  });
+function meta(m) {
+  return [m.dose, m.frequency, abbr(m.drug_class_epc)].filter(Boolean).join(' · ');
 }
 
-function renderCondition(c) {
-  const resolved = c.icd11_code && !c.is_unresolved;
-  let html = `<div class="card-name">
-    ${esc(c.name_display || c.name_user)}
-    <span class="card-user">"${esc(c.name_user)}"</span>
-  </div>`;
+const ABBR = {
+  'Selective Serotonin Reuptake Inhibitor':'SSRI',
+  'Serotonin and Norepinephrine Reuptake Inhibitor':'SNRI',
+  'Serotonin Reuptake Inhibitor/Antagonist':'SRIA',
+  'Beta-Adrenergic Blocker':'Beta Blocker',
+  'Central Nervous System Stimulant':'CNS Stimulant',
+  'Angiotensin-Converting Enzyme Inhibitor':'ACE Inhibitor',
+  'Angiotensin II Receptor Blocker':'ARB',
+  'HMG-CoA Reductase Inhibitor':'Statin',
+  'Calcium Channel Blocker':'CCB',
+  'Gamma-Aminobutyric Acid Analog':'GABA Analog',
+  'Nonsteroidal Anti-inflammatory Drug':'NSAID',
+  'Cholinesterase Inhibitor':'ChEI',
+  'Alpha/Beta Adrenergic Agonist':'Adrenergic Agonist',
+};
+function abbr(cls) { return cls ? (ABBR[cls] || cls) : null; }
+function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+function esc(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
 
-  html += '<div class="badges">';
-  if (c.icd11_code)  html += badge(c.icd11_code, 'code', 'ICD-11 code');
-  if (c.status)      html += badge(c.status, c.status === 'active' ? 'ok' : 'atc');
-  if (c.is_unresolved) html += badge('unresolved', 'unres');
-  html += '</div>';
+function openAllMeds() { document.getElementById('modal-overlay').classList.add('visible'); }
+function closeAllMeds() { document.getElementById('modal-overlay').classList.remove('visible'); }
+function closeModal(e) { if (e.target===document.getElementById('modal-overlay')) closeAllMeds(); }
 
-  if (c.icd11_definition) {
-    const short = c.icd11_definition.length > 280
-      ? c.icd11_definition.slice(0, 280) + '…'
-      : c.icd11_definition;
-    html += `<div class="card-def">${esc(short)}</div>`;
-  }
-
-  if (c.icd11_index_terms && c.icd11_index_terms.length) {
-    html += `<div class="index-terms">${c.icd11_index_terms.slice(0,6).map(t => `<span class="index-term">${esc(t)}</span>`).join('')}</div>`;
-  }
-
-  if (c.icd11_browser_url) {
-    html += `<a class="icd-link" href="${c.icd11_browser_url}" target="_blank">↗ ICD-11 Browser</a>`;
-  }
-
-  return html;
-}
-
-function renderMedication(m) {
-  let html = `<div class="card-name">
-    ${esc(m.name_generic || m.name_user)}
-    <span class="card-user">"${esc(m.name_user)}"</span>
-  </div>`;
-
-  html += '<div class="badges">';
-  if (m.rxnorm_id)      html += badge('RxNorm ' + m.rxnorm_id, 'code');
-  if (m.drug_class_epc) html += badge(m.drug_class_epc, 'class');
-  if (m.affects_hrv_hr) html += badge('⚡ affects HRV/HR', 'hrv');
-  if (m.atc_code)       html += badge('ATC ' + m.atc_code, 'atc');
-  if (m.dose)           html += badge(m.dose, 'atc');
-  if (m.frequency)      html += badge(m.frequency, 'atc');
-  if (m.is_unresolved)  html += badge('unresolved', 'unres');
-  html += '</div>';
-
-  if (m.brand_names && m.brand_names.length) {
-    html += `<div class="brands">Brands: <span>${m.brand_names.join(', ')}</span></div>`;
-  }
-  if (m.schedule) {
-    html += `<div class="brands">Schedule: <span>${esc(m.schedule)}</span></div>`;
-  }
-
-  return html;
-}
-
-function renderSymptom(s) {
-  let html = `<div class="card-name">
-    ${esc(s.name_display || s.name_user)}
-    <span class="card-user">"${esc(s.name_user)}"</span>
-  </div>`;
-
-  html += '<div class="badges">';
-  if (s.icd11_code)    html += badge(s.icd11_code, 'code', 'ICD-11 code');
-  if (s.cluster)       html += badge(s.cluster, 'class');
-  if (s.duration_hint) html += badge(s.duration_hint, 'atc');
-  if (s._resolution && s._resolution.startsWith('cluster_fallback'))
-                        html += badge('cluster fallback', 'unres');
-  if (s.is_unresolved) html += badge('unresolved', 'unres');
-  html += '</div>';
-
-  if (s.icd11_definition) {
-    const short = s.icd11_definition.length > 200
-      ? s.icd11_definition.slice(0, 200) + '…'
-      : s.icd11_definition;
-    html += `<div class="card-def">${esc(short)}</div>`;
-  }
-
-  if (s.icd11_browser_url) {
-    html += `<a class="icd-link" href="${s.icd11_browser_url}" target="_blank">↗ ICD-11 Browser</a>`;
-  }
-
-  return html;
-}
-
-function esc(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-// Restore URL from localStorage
 const DEFAULT_URL = 'https://web-production-6e746.up.railway.app';
-const savedUrl = localStorage.getItem('enrichment_url') || DEFAULT_URL;
-document.getElementById('service-url').value = savedUrl;
-document.getElementById('service-url').addEventListener('input', e => {
-  localStorage.setItem('enrichment_url', e.target.value);
-});
+document.getElementById('service-url').value = localStorage.getItem('enrichment_url') || DEFAULT_URL;
+document.getElementById('service-url').addEventListener('input', e => localStorage.setItem('enrichment_url', e.target.value));
 </script>
 </body>
 </html>
