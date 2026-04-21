@@ -271,16 +271,64 @@ class ICD11Client:
         return {"Authorization": f"Bearer {token}", "Accept": "application/json",
                 "Accept-Language": "en", "API-Version": "v2"}
 
-    def _search_one(self, query: str, flexisearch: bool, headers: dict) -> Optional[dict]:
+    def _score_entity(self, entity: dict, query: str) -> int:
+        """
+        Score an ICD-11 search result by how well its title matches the query.
+        Higher = better. Used to pick the most relevant result when API returns
+        multiple candidates (e.g. 'Anxiety Disorder' → prefer 6B00 over 6E63).
+
+        Scoring rules:
+          +100  exact case-insensitive title match
+          +60   title starts with query
+          +40   title contains all query words
+          +20   title contains any query word
+          -30   title contains 'secondary' / 'other specified' / 'unspecified'
+                (these are catch-all codes, almost never what the user meant)
+          -20   title contains 'NOS' / 'not elsewhere classified'
+        """
+        title = (entity.get("title") or "").lower().strip()
+        q     = query.lower().strip()
+        score = 0
+
+        if title == q:
+            score += 100
+        elif title.startswith(q):
+            score += 60
+        else:
+            words = q.split()
+            if all(w in title for w in words):
+                score += 40
+            elif any(w in title for w in words):
+                score += 20
+
+        # Penalise vague / secondary / catch-all codes
+        for bad in ("secondary", "other specified", "unspecified", " nos ", "not elsewhere"):
+            if bad in title:
+                score -= 30
+
+        return score
+
+    def _search_best(self, query: str, flexisearch: bool, headers: dict) -> Optional[dict]:
+        """Fetch up to 10 results and return the one with the highest score."""
         time.sleep(0.1)
         params = urllib.parse.urlencode({
             "q": query, "flatResults": "true", "highlightingEnabled": "false",
-            "useFlexisearch": "true" if flexisearch else "false", "medicalCodingMode": "true",
+            "useFlexisearch": "true" if flexisearch else "false",
+            "medicalCodingMode": "true",
         })
         data = _http_get(f"{ICD11_SEARCH_URL}?{params}", headers=headers, timeout=10)
         if not data: return None
         entities = data.get("destinationEntities", [])
-        return entities[0] if entities else None
+        if not entities: return None
+
+        # Score all results and pick the best
+        scored = [(self._score_entity(e, query), i, e) for i, e in enumerate(entities)]
+        scored.sort(key=lambda x: (-x[0], x[1]))  # highest score first, stable by position
+        best_score, _, best = scored[0]
+
+        log.info("  scored %d results, best score=%d title='%s'",
+                 len(entities), best_score, (best.get("title") or "")[:50])
+        return best
 
     def _get_entity_details(self, entity_uri: str, headers: dict) -> dict:
         time.sleep(0.1)
@@ -369,10 +417,11 @@ class ICD11Client:
         for query, flex, label in attempts:
             if not query: continue
             log.info("ICD-11 <- '%s' [%s]", query, label)
-            found = self._search_one(query, flex, headers)
+            found = self._search_best(query, flex, headers)
             if found:
                 best = found
-                log.info("  [found] code=%s", found.get("theCode"))
+                log.info("  [found] code=%s title='%s'",
+                         found.get("theCode"), (found.get("title") or "")[:50])
                 break
             else:
                 log.info("  [empty]")
