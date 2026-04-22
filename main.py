@@ -607,11 +607,63 @@ class MedicalEnrichmentService:
         })
         return out
 
-    # ── clarification_needed: inject reason templates ─────────────────────────
+    # ── clarification_needed: deduplicate + inject reason templates ──────────────
+    def _dedup_clarifications(self, clars: list,
+                              conditions: list, medications: list, symptoms: list) -> list:
+        """
+        Drop a clarification_needed item ONLY when the condition it asks about
+        is already present in conditions[] or symptoms[].
+
+        Key insight: clarifications for medications exist because their INDICATION
+        is unknown, even when the drug itself is in medications[]. We must NOT
+        remove them just because the drug appears in medications[].
+        We only drop a clarification when ALL of its suggested_conditions are
+        already resolved (present in conditions[] or symptoms[]).
+
+        Example - KEEP:
+          clar: gabapentin -> ["Neuropathic Pain","Epilepsy","Anxiety"]
+          conditions: [Depressive Disorder]
+          -> KEEP: none of the suggestions are in conditions yet
+
+        Example - DROP:
+          clar: "for depression" -> ["Depressive Disorder"]
+          conditions: [Depressive Disorder]
+          -> DROP: condition already confirmed
+        """
+        condition_displays = {
+            (c.get("name_display") or "").strip().lower()
+            for c in conditions
+        }
+        symptom_displays = {
+            (s.get("name_display") or "").strip().lower()
+            for s in symptoms
+        }
+        resolved = condition_displays | symptom_displays
+
+        filtered = []
+        for item in clars:
+            item_type = item.get("type", "condition")
+            suggested = item.get("suggested_conditions", [])
+
+            if item_type == "condition" and suggested:
+                # Drop only if ALL suggested conditions are already confirmed
+                all_covered = all(s.strip().lower() in resolved for s in suggested)
+                if all_covered:
+                    log.info("Clar dedup: dropped '%s' (all suggestions already resolved)",
+                             item.get("raw_text", "")[:60])
+                    continue
+
+            filtered.append(item)
+
+        dropped = len(clars) - len(filtered)
+        if dropped:
+            log.info("Clar dedup: %d/%d dropped", dropped, len(clars))
+        return filtered
+
     def _enrich_clarifications(self, items: list) -> list:
         """
-        v5 prompt does not generate 'reason' text (saves output tokens).
-        Python injects a template reason based on type.
+        Inject template 'reason' text for each clarification item.
+        v5 prompt omits 'reason' to save output tokens.
         """
         result = []
         for item in items:
@@ -632,6 +684,10 @@ class MedicalEnrichmentService:
         log.info("=" * 55)
         log.info("Enriching: conditions=%d  medications=%d  symptoms=%d  clarifications=%d",
                  len(conditions), len(medications), len(symptoms), len(clars))
+
+        # Deduplicate clarifications BEFORE enrichment —
+        # drop any whose raw_text is already covered by extracted entities
+        clars = self._dedup_clarifications(clars, conditions, medications, symptoms)
 
         enriched = dict(payload)
         enriched["conditions"]         = [self._enrich_condition(c)  for c in conditions]
